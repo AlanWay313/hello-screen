@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Mail, Phone, MapPin, FileText, UserCheck, UserX } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Mail, Phone, MapPin, FileText, UserCheck, UserX, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { DataTable, FilterOption } from "@/components/ui/data-table"
 import useIntegrador from "@/hooks/use-integrador"
+import { useCachedData } from "@/hooks/use-cached-data"
 import ResetSenha from "../resetsenha"
 import EditarCliente from "../editarcliente"
 import ReintegrarCliente from "../reintegrarcliente"
@@ -242,58 +243,62 @@ const clienteFilters: FilterOption[] = [
 ]
 
 export function TabelaDeClientes() {
-  const [data, setData] = React.useState<Cliente[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
   const integrador = useIntegrador()
 
   const fetchClientes = React.useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const result = await api.get(
-        "/src/clientes/listarclientes.php",
-        { params: { idIntegra: integrador } }
-      )
+    const result = await api.get(
+      "/src/clientes/listarclientes.php",
+      { params: { idIntegra: integrador } }
+    )
 
-      // Add status field based on existing data
-      const clientesWithStatus = (result.data.data || []).map((cliente: any) => ({
-        ...cliente,
-        status: cliente.email ? 'ativo' : 'inativo',
-        tipo_documento: cliente.cpf_cnpj?.length > 14 ? 'cnpj' : 'cpf',
-      }))
+    // Add status field based on existing data
+    const clientesWithStatus = (result.data.data || []).map((cliente: any) => ({
+      ...cliente,
+      status: cliente.email ? 'ativo' : 'inativo',
+      tipo_documento: cliente.cpf_cnpj?.length > 14 ? 'cnpj' : 'cpf',
+    }))
 
-      setData(clientesWithStatus)
-    } catch (err) {
-      console.error("Erro ao buscar clientes:", err)
-      setError("Erro ao carregar clientes. Tente novamente.")
-    } finally {
-      setLoading(false)
-    }
+    return clientesWithStatus
   }, [integrador])
 
-  React.useEffect(() => {
-    if (integrador) {
-      fetchClientes()
-    }
-  }, [fetchClientes, integrador])
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    refresh, 
+    lastUpdated,
+    isCached 
+  } = useCachedData<Cliente[]>(fetchClientes, {
+    cacheKey: `clientes-${integrador}`,
+    cacheTime: 5 * 60 * 1000, // 5 minutos
+    enabled: !!integrador,
+  })
 
-  const columns = React.useMemo(() => getColumns(fetchClientes), [fetchClientes])
+  const columns = React.useMemo(() => getColumns(refresh), [refresh])
 
   const handleFilterChange = React.useCallback((filters: Record<string, string>) => {
     console.log("Filtros aplicados:", filters)
   }, [])
 
-  if (loading) {
+  // Formatar tempo desde última atualização
+  const formatLastUpdated = () => {
+    if (!lastUpdated) return null
+    const diff = Date.now() - lastUpdated.getTime()
+    const minutes = Math.floor(diff / 60000)
+    if (minutes < 1) return "agora"
+    if (minutes === 1) return "1 min atrás"
+    return `${minutes} min atrás`
+  }
+
+  if (isLoading && !data) {
     return <Loading />
   }
 
   if (error) {
     return (
       <div className="w-full flex flex-col items-center justify-center py-12 space-y-4">
-        <p className="text-destructive text-center">{error}</p>
-        <Button onClick={fetchClientes} variant="outline">
+        <p className="text-destructive text-center">{error.message}</p>
+        <Button onClick={refresh} variant="outline">
           Tentar Novamente
         </Button>
       </div>
@@ -301,16 +306,29 @@ export function TabelaDeClientes() {
   }
 
   return (
-    <DataTable
-      columns={columns}
-      data={data}
-      searchPlaceholder="Pesquisar por nome, email, documento ou contrato..."
-      searchableColumns={["nome", "email", "cpf_cnpj", "ole_contract_number", "contato"]}
-      onRefresh={fetchClientes}
-      isLoading={loading}
-      emptyMessage="Nenhum cliente encontrado."
-      filters={clienteFilters}
-      onFilterChange={handleFilterChange}
-    />
+    <div className="space-y-4">
+      {/* Cache indicator */}
+      {lastUpdated && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          <span>
+            Atualizado {formatLastUpdated()}
+            {isCached && " (cache)"}
+          </span>
+        </div>
+      )}
+      
+      <DataTable
+        columns={columns}
+        data={data || []}
+        searchPlaceholder="Pesquisar por nome, email, documento ou contrato..."
+        searchableColumns={["nome", "email", "cpf_cnpj", "ole_contract_number", "contato"]}
+        onRefresh={refresh}
+        isLoading={isLoading}
+        emptyMessage="Nenhum cliente encontrado."
+        filters={clienteFilters}
+        onFilterChange={handleFilterChange}
+      />
+    </div>
   )
 }

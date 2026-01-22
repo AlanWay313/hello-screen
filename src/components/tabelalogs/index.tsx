@@ -69,10 +69,10 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-
 import { Loading } from "../loading";
 import api from "@/services/api";
 import useIntegrador from "@/hooks/use-integrador";
+import { useCachedData } from "@/hooks/use-cached-data";
 
 // Interface para o tipo de log
 interface LogData {
@@ -576,10 +576,7 @@ export function TabelaLogs() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
-  const [data, setData] = React.useState<LogData[]>([]);
   const [filteredData, setFilteredData] = React.useState<LogData[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [refreshing, setRefreshing] = React.useState(false);
   const [selectedLog, setSelectedLog] = React.useState<LogData | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [dateFilters, setDateFilters] = React.useState<DateFilters>({
@@ -590,6 +587,24 @@ export function TabelaLogs() {
   const [globalFilter, setGlobalFilter] = React.useState('');
   
   const integrador: any = useIntegrador();
+
+  // Fetch com cache
+  const fetchLogs = React.useCallback(async () => {
+    const result = await api.get("/src/services/LogsDistintosClientes.php", { params: { idIntegra: integrador } });
+    return result.data.data || [];
+  }, [integrador]);
+
+  const { 
+    data, 
+    isLoading, 
+    refresh, 
+    lastUpdated,
+    isCached 
+  } = useCachedData<LogData[]>(fetchLogs, {
+    cacheKey: `logs-${integrador}`,
+    cacheTime: 3 * 60 * 1000, // 3 minutos
+    enabled: !!integrador,
+  });
 
   const openLogDetails = (logData: LogData) => {
     setSelectedLog(logData);
@@ -649,7 +664,9 @@ export function TabelaLogs() {
   }, [dateFilters, globalFilter]);
 
   React.useEffect(() => {
-    setFilteredData(applyFilters(data));
+    if (data) {
+      setFilteredData(applyFilters(data));
+    }
   }, [data, applyFilters]);
 
   const clearAllFilters = () => {
@@ -766,23 +783,15 @@ export function TabelaLogs() {
     },
   ], []);
 
-  async function handleClientes() {
-    setRefreshing(true);
-    setLoading(true);
-    try {
-      const result = await api.get("/src/services/LogsDistintosClientes.php", { params: { idIntegra: integrador } });
-      setData(result.data.data || []);
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  // Formatar tempo desde última atualização
+  const formatLastUpdated = () => {
+    if (!lastUpdated) return null
+    const diff = Date.now() - lastUpdated.getTime()
+    const minutes = Math.floor(diff / 60000)
+    if (minutes < 1) return "agora"
+    if (minutes === 1) return "1 min atrás"
+    return `${minutes} min atrás`
   }
-
-  React.useEffect(() => {
-    handleClientes();
-  }, []);
 
   const table = useReactTable({
     data: filteredData,
@@ -804,7 +813,7 @@ export function TabelaLogs() {
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalRows = table.getFilteredRowModel().rows.length;
 
-  if (loading && !refreshing) return <Loading />;
+  if (isLoading && !data) return <Loading />;
 
   return (
     <div className="space-y-5">
@@ -852,9 +861,14 @@ export function TabelaLogs() {
                 onClearFilters={clearAllFilters}
               />
 
-              <Button variant="outline" size="sm" onClick={handleClientes} disabled={refreshing} className="gap-2">
-                <RotateCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading} className="gap-2">
+                <RotateCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Atualizar
+                {isCached && lastUpdated && (
+                  <span className="text-xs text-muted-foreground ml-1">
+                    ({formatLastUpdated()})
+                  </span>
+                )}
               </Button>
 
               <DropdownMenu>
