@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export interface MonthlySnapshot {
   month: string; // formato: "2024-01" 
@@ -13,19 +13,21 @@ export interface MonthlySnapshot {
 const STORAGE_KEY = 'sysprov_clients_history';
 
 export function useClientsHistory() {
-  const [history, setHistory] = useState<MonthlySnapshot[]>([]);
-
-  // Carregar histórico do localStorage
-  useEffect(() => {
+  const [history, setHistory] = useState<MonthlySnapshot[]>(() => {
+    // Carregar do localStorage na inicialização
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setHistory(JSON.parse(stored));
+        return JSON.parse(stored);
       }
     } catch (e) {
       console.error('Erro ao carregar histórico:', e);
     }
-  }, []);
+    return [];
+  });
+
+  const historyRef = useRef(history);
+  historyRef.current = history;
 
   // Salvar snapshot do mês atual
   const saveSnapshot = useCallback((data: {
@@ -38,63 +40,64 @@ export function useClientsHistory() {
     const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const monthLabel = `${monthNames[now.getMonth()]}/${String(now.getFullYear()).slice(-2)}`;
 
-    setHistory(prev => {
-      // Verificar se já existe snapshot deste mês
-      const existingIndex = prev.findIndex(s => s.month === monthKey);
-      
-      const newSnapshot: MonthlySnapshot = {
-        month: monthKey,
-        monthLabel,
-        ativos: data.ativos,
-        inativos: data.inativos,
-        cancelados: data.cancelados,
-        total: data.ativos + data.inativos,
-        timestamp: now.toISOString(),
-      };
+    const prev = historyRef.current;
+    
+    // Verificar se já existe snapshot deste mês
+    const existingIndex = prev.findIndex(s => s.month === monthKey);
+    
+    const newSnapshot: MonthlySnapshot = {
+      month: monthKey,
+      monthLabel,
+      ativos: data.ativos,
+      inativos: data.inativos,
+      cancelados: data.cancelados,
+      total: data.ativos + data.inativos,
+      timestamp: now.toISOString(),
+    };
 
-      let updated: MonthlySnapshot[];
-      
-      if (existingIndex >= 0) {
-        // Atualiza o snapshot existente do mês (sempre com os dados mais recentes)
-        updated = [...prev];
-        updated[existingIndex] = newSnapshot;
-      } else {
-        // Adiciona novo mês
-        updated = [...prev, newSnapshot];
-      }
+    let updated: MonthlySnapshot[];
+    
+    if (existingIndex >= 0) {
+      // Atualiza o snapshot existente do mês (sempre com os dados mais recentes)
+      updated = [...prev];
+      updated[existingIndex] = newSnapshot;
+    } else {
+      // Adiciona novo mês
+      updated = [...prev, newSnapshot];
+    }
 
-      // Ordenar por mês e manter apenas os últimos 12 meses
-      updated = updated
-        .sort((a, b) => a.month.localeCompare(b.month))
-        .slice(-12);
+    // Ordenar por mês e manter apenas os últimos 12 meses
+    updated = updated
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12);
 
-      // Salvar no localStorage
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error('Erro ao salvar histórico:', e);
-      }
+    // Salvar no localStorage
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Erro ao salvar histórico:', e);
+    }
 
-      return updated;
-    });
+    setHistory(updated);
   }, []);
 
   // Calcular novos clientes comparando com mês anterior
   const calculateNewClients = useCallback((currentAtivos: number): number => {
-    if (history.length < 2) return 0;
+    const current = historyRef.current;
+    if (current.length < 2) return 0;
     
-    const sortedHistory = [...history].sort((a, b) => a.month.localeCompare(b.month));
+    const sortedHistory = [...current].sort((a, b) => a.month.localeCompare(b.month));
     const previousMonth = sortedHistory[sortedHistory.length - 2];
     
     if (!previousMonth) return 0;
     
     const diff = currentAtivos - previousMonth.ativos;
     return Math.max(0, diff); // Retorna 0 se for negativo
-  }, [history]);
+  }, []);
 
   // Obter dados formatados para o gráfico
   const getChartData = useCallback(() => {
-    return history
+    return historyRef.current
       .sort((a, b) => a.month.localeCompare(b.month))
       .map((snapshot, index, arr) => {
         // Calcular novos comparando com mês anterior
@@ -109,7 +112,7 @@ export function useClientsHistory() {
           novos,
         };
       });
-  }, [history]);
+  }, []);
 
   return {
     history,
