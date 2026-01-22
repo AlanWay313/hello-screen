@@ -1,5 +1,5 @@
-import { Outlet } from "react-router-dom"
 import Sidebar from "./components/sidebar"
+import { AnimatedOutlet } from "./components/animated-outlet"
 
 function App() {
   return (
@@ -8,9 +8,9 @@ function App() {
       <Sidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 ml-[280px] min-h-screen">
-        <div className="p-6 animate-fade-in">
-          <Outlet />
+      <main className="flex-1 ml-[280px] min-h-screen overflow-hidden">
+        <div className="p-6">
+          <AnimatedOutlet />
         </div>
       </main>
     </div>
