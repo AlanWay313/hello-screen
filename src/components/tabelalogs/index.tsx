@@ -170,7 +170,7 @@ const CustomModal = ({
   );
 };
 
-// Componente Modal de Detalhes
+// Componente Modal de Detalhes Melhorado
 const LogDetailsModal = ({ 
   isOpen, 
   onClose, 
@@ -180,13 +180,13 @@ const LogDetailsModal = ({
   onClose: () => void; 
   logData: LogData | null; 
 }) => {
-  const [copied, setCopied] = React.useState(false);
+  const [copiedField, setCopiedField] = React.useState<string | null>(null);
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, field: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
     } catch (error) {
       console.error('Erro ao copiar:', error);
     }
@@ -206,79 +206,123 @@ const LogDetailsModal = ({
     });
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("pt-BR", {
+      weekday: 'long',
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
   return (
     <CustomModal
       isOpen={isOpen}
       onClose={onClose}
       title="Detalhes do Log"
       description="Informações completas sobre o registro"
-      maxWidth="max-w-3xl"
+      maxWidth="max-w-2xl"
     >
-      <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <StatusBadge status={logData.codeLog} size="lg" />
-          <span className="text-sm text-muted-foreground">
-            {formatDateTime(logData.created_at)}
-          </span>
+      <div className="space-y-6">
+        {/* Header com Status e Data */}
+        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-secondary/50 to-transparent rounded-xl">
+          <div className="flex items-center gap-3">
+            <StatusBadge status={logData.codeLog} size="lg" />
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-medium text-foreground">{formatTime(logData.created_at)}</p>
+            <p className="text-xs text-muted-foreground capitalize">{formatDate(logData.created_at)}</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-secondary/30 rounded-xl border border-border">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Documento</p>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-lg text-foreground">{logData.id_cliente}</span>
+        {/* Grid de Informações */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Documento */}
+          <div className="group p-4 bg-card rounded-xl border border-border hover:border-primary/30 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Documento
+              </p>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => copyToClipboard(logData.id_cliente)}
-                className="h-8 w-8"
+                onClick={() => copyToClipboard(logData.id_cliente, 'doc')}
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                {copied ? <CheckCircle className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+                {copiedField === 'doc' ? <CheckCircle className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
               </Button>
             </div>
+            <span className="font-mono text-lg font-semibold text-foreground">{logData.id_cliente}</span>
           </div>
 
-          <div className="p-4 bg-secondary/30 rounded-xl border border-border">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Data/Hora</p>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-foreground">{formatDateTime(logData.created_at)}</span>
-            </div>
+          {/* Data/Hora */}
+          <div className="p-4 bg-card rounded-xl border border-border">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              Data e Hora
+            </p>
+            <span className="text-lg font-semibold text-foreground">{formatDateTime(logData.created_at)}</span>
           </div>
         </div>
 
-        <div className="p-4 bg-secondary/30 rounded-xl border border-border">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Título</p>
-          <p className="text-foreground font-medium">{logData.title}</p>
+        {/* Título */}
+        <div className="p-4 bg-card rounded-xl border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <Info className="h-3.5 w-3.5" />
+            Título do Log
+          </p>
+          <p className="text-foreground font-medium text-lg">{logData.title}</p>
         </div>
 
-        <div className="p-4 bg-secondary/30 rounded-xl border border-border">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Descrição</p>
+        {/* Descrição/Ação */}
+        <div className="p-4 bg-card rounded-xl border border-border">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" />
+              Descrição Completa
+            </p>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => copyToClipboard(logData.acao)}
+              onClick={() => copyToClipboard(logData.acao, 'acao')}
               className="h-7 gap-1.5 text-xs"
             >
-              {copied ? <CheckCircle className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copiedField === 'acao' ? <CheckCircle className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
               Copiar
             </Button>
           </div>
-          <pre className="whitespace-pre-wrap text-sm text-foreground/80 leading-relaxed font-mono bg-background/50 p-4 rounded-lg border border-border">
-            {logData.acao}
-          </pre>
+          <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
+            <pre className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed font-mono p-4 max-h-[200px] overflow-y-auto">
+              {logData.acao}
+            </pre>
+          </div>
         </div>
 
         <Separator />
 
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Fechar
+        {/* Ações do Modal */}
+        <div className="flex flex-col sm:flex-row justify-between gap-3">
+          <Button 
+            variant="outline" 
+            onClick={() => copyToClipboard(JSON.stringify(logData, null, 2), 'json')} 
+            className="gap-2"
+          >
+            {copiedField === 'json' ? <CheckCircle className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+            Copiar como JSON
           </Button>
-          <Button onClick={() => copyToClipboard(JSON.stringify(logData, null, 2))} className="gap-2">
-            {copied ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            Copiar JSON
+          <Button onClick={onClose}>
+            Fechar
           </Button>
         </div>
       </div>
@@ -687,26 +731,38 @@ export function TabelaLogs() {
     {
       id: "actions",
       enableHiding: false,
-      cell: ({ row }: any) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 bg-popover border border-border z-50">
-            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div 
-              className="flex items-center px-2 py-1.5 text-sm hover:bg-secondary cursor-pointer rounded-sm"
-              onClick={() => openLogDetails(row.original)}
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              Ver detalhes
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      cell: ({ row }: any) => {
+        const [dropdownOpen, setDropdownOpen] = React.useState(false);
+        
+        const handleViewDetails = () => {
+          setDropdownOpen(false);
+          // Pequeno delay para garantir que o dropdown feche antes de abrir o modal
+          setTimeout(() => {
+            openLogDetails(row.original);
+          }, 100);
+        };
+
+        return (
+          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 bg-popover border border-border z-[100]">
+              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <button 
+                className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent"
+                onClick={handleViewDetails}
+              >
+                <Eye className="h-4 w-4 text-primary" />
+                Ver detalhes
+              </button>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ], []);
 
