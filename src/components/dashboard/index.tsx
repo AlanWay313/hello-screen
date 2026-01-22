@@ -7,7 +7,7 @@ import { WeeklyBarChart } from './charts/bar-chart';
 import { Button } from '@/components/ui/button';
 import { DashboardFiltersBar } from './dashboard-filters-bar';
 import { DashboardFilters, defaultFilters } from './dashboard-filters-context';
-import { ClientesCanceladosApi } from '@/services/clientesCancelados';
+import { ListarTodosClientes } from '@/services/listarTodosClientes';
 import useIntegrador from '@/hooks/use-integrador';
 import { exportToCSV, clienteExportColumns } from '@/lib/export-utils';
 import {
@@ -38,7 +38,7 @@ export function Dashboard() {
     
     setIsExporting(true);
     try {
-      const clientes = await ClientesCanceladosApi(integrador);
+      const clientes = await ListarTodosClientes(integrador);
       if (!clientes || clientes.length === 0) {
         alert('Não há dados para exportar.');
         return;
