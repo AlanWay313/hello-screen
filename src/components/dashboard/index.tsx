@@ -1,5 +1,5 @@
-import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw, Download, ChevronDown, Users, UserCheck, UserX, XCircle, Settings2, GripVertical, Eye, EyeOff, RotateCcw, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw, Download, ChevronDown, Users, UserCheck, UserX, XCircle, Settings2, GripVertical, Eye, EyeOff, RotateCcw, ChevronUp, ChevronDown as ChevronDownIcon, Move } from 'lucide-react';
+import { useState, useCallback, DragEvent } from 'react';
 import { StatsOverview } from './stats-overview';
 import { ClientsChart } from './charts/clients-chart';
 import { StatusPieChart } from './charts/status-pie-chart';
@@ -35,7 +35,19 @@ export function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
   const integrador = useIntegrador();
   
-  const { widgets, visibleWidgets, toggleWidget, moveWidget, resetLayout } = useDashboardLayout();
+  const { 
+    widgets, 
+    visibleWidgets, 
+    toggleWidget, 
+    moveWidget, 
+    resetLayout,
+    draggedWidget,
+    dragOverWidget,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    handleDragLeave,
+  } = useDashboardLayout();
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -136,27 +148,72 @@ export function Dashboard() {
     </button>
   );
 
-  const renderWidget = (widgetId: string) => {
-    switch (widgetId) {
-      case 'stats':
-        return <StatsOverview key={`stats-${refreshKey}`} filters={filters} />;
-      case 'clients-chart':
-        return (
-          <div className={viewMode === 'grid' ? 'lg:col-span-2' : ''}>
-            <ClientsChart key={`clients-${refreshKey}`} filters={filters} />
+  const renderWidget = (widgetId: string, isDraggable: boolean = false) => {
+    const isDragging = draggedWidget === widgetId;
+    const isDragOver = dragOverWidget === widgetId;
+    
+    const dragProps = isDraggable ? {
+      draggable: true,
+      onDragStart: (e: DragEvent) => {
+        e.dataTransfer.effectAllowed = 'move';
+        handleDragStart(widgetId);
+      },
+      onDragOver: (e: DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        handleDragOver(widgetId);
+      },
+      onDragLeave: handleDragLeave,
+      onDrop: (e: DragEvent) => {
+        e.preventDefault();
+        handleDragEnd();
+      },
+      onDragEnd: handleDragEnd,
+    } : {};
+
+    const wrapperClasses = isDraggable ? `
+      relative group cursor-move transition-all duration-200
+      ${isDragging ? 'opacity-50 scale-95' : ''}
+      ${isDragOver ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
+    ` : '';
+
+    const content = (() => {
+      switch (widgetId) {
+        case 'stats':
+          return <StatsOverview key={`stats-${refreshKey}`} filters={filters} />;
+        case 'clients-chart':
+          return (
+            <div className={viewMode === 'grid' ? 'lg:col-span-2' : ''}>
+              <ClientsChart key={`clients-${refreshKey}`} filters={filters} />
+            </div>
+          );
+        case 'status-pie':
+          return <StatusPieChart key={`pie-${refreshKey}`} filters={filters} />;
+        case 'weekly-bar':
+          return (
+            <div className={viewMode === 'grid' ? 'xl:col-span-2' : ''}>
+              <WeeklyBarChart key={`bar-${refreshKey}`} filters={filters} />
+            </div>
+          );
+        default:
+          return null;
+      }
+    })();
+
+    if (!isDraggable) return content;
+
+    return (
+      <div {...dragProps} className={wrapperClasses}>
+        {/* Drag Handle Indicator */}
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 px-2 py-1 bg-primary text-primary-foreground rounded-full text-xs font-medium shadow-lg">
+            <Move className="h-3 w-3" />
+            Arraste para reordenar
           </div>
-        );
-      case 'status-pie':
-        return <StatusPieChart key={`pie-${refreshKey}`} filters={filters} />;
-      case 'weekly-bar':
-        return (
-          <div className={viewMode === 'grid' ? 'xl:col-span-2' : ''}>
-            <WeeklyBarChart key={`bar-${refreshKey}`} filters={filters} />
-          </div>
-        );
-      default:
-        return null;
-    }
+        </div>
+        {content}
+      </div>
+    );
   };
 
   return (
@@ -349,7 +406,7 @@ export function Dashboard() {
       {/* Widgets renderizados dinamicamente */}
       {visibleWidgets.map(widget => {
         if (widget.id === 'stats') {
-          return <div key={widget.id}>{renderWidget(widget.id)}</div>;
+          return <div key={widget.id}>{renderWidget(widget.id, true)}</div>;
         }
         return null;
       })}
@@ -363,7 +420,7 @@ export function Dashboard() {
       `}>
         {visibleWidgets.filter(w => w.id !== 'stats').map(widget => (
           <div key={widget.id}>
-            {renderWidget(widget.id)}
+            {renderWidget(widget.id, true)}
           </div>
         ))}
       </div>

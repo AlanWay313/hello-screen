@@ -22,7 +22,6 @@ export function useDashboardLayout() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Merge com defaults para garantir novos widgets
         return DEFAULT_WIDGETS.map(defaultWidget => {
           const saved = parsed.find((w: WidgetConfig) => w.id === defaultWidget.id);
           return saved || defaultWidget;
@@ -34,7 +33,8 @@ export function useDashboardLayout() {
     return DEFAULT_WIDGETS;
   });
 
-  const [isDragging, setIsDragging] = useState(false);
+  const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
+  const [dragOverWidget, setDragOverWidget] = useState<string | null>(null);
 
   // Salvar no localStorage
   useEffect(() => {
@@ -81,6 +81,33 @@ export function useDashboardLayout() {
     });
   }, []);
 
+  // Drag and Drop handlers
+  const handleDragStart = useCallback((widgetId: string) => {
+    setDraggedWidget(widgetId);
+  }, []);
+
+  const handleDragOver = useCallback((widgetId: string) => {
+    if (draggedWidget && draggedWidget !== widgetId) {
+      setDragOverWidget(widgetId);
+    }
+  }, [draggedWidget]);
+
+  const handleDragEnd = useCallback(() => {
+    if (draggedWidget && dragOverWidget && draggedWidget !== dragOverWidget) {
+      const fromIndex = widgets.findIndex(w => w.id === draggedWidget);
+      const toIndex = widgets.findIndex(w => w.id === dragOverWidget);
+      if (fromIndex !== -1 && toIndex !== -1) {
+        reorderWidgets(fromIndex, toIndex);
+      }
+    }
+    setDraggedWidget(null);
+    setDragOverWidget(null);
+  }, [draggedWidget, dragOverWidget, widgets, reorderWidgets]);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverWidget(null);
+  }, []);
+
   const visibleWidgets = widgets.filter(w => w.visible);
 
   return {
@@ -90,7 +117,12 @@ export function useDashboardLayout() {
     reorderWidgets,
     resetLayout,
     moveWidget,
-    isDragging,
-    setIsDragging,
+    // Drag and drop
+    draggedWidget,
+    dragOverWidget,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    handleDragLeave,
   };
 }
