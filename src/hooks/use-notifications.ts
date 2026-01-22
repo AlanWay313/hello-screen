@@ -158,32 +158,36 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         if (omitPatterns.some(p => p.test(text))) return;
 
         const codeLog = log.codeLog?.toLowerCase() || '';
+        const clienteId = log.id_cliente || '';
+        const clienteNome = log.nome_cliente || log.cliente_nome || '';
         
         // Detectar novo cliente
         if (newClientPatterns.some(p => p.test(text)) || codeLog === 'success') {
           addNotification({
             type: 'new_client',
             title: 'Novo Cliente Cadastrado',
-            message: log.title || `Cliente ${log.id_cliente} foi cadastrado`,
-            data: log,
+            message: clienteNome 
+              ? `${clienteNome} (${clienteId})` 
+              : log.title || `Documento: ${clienteId}`,
+            data: { ...log, clienteId, clienteNome },
           });
         }
         // Notificar erros
         else if (codeLog === 'error') {
           addNotification({
             type: 'error',
-            title: 'Erro no Sistema',
+            title: clienteNome ? `Erro: ${clienteNome}` : 'Erro no Sistema',
             message: log.title || log.acao?.substring(0, 100) || 'Ocorreu um erro',
-            data: log,
+            data: { ...log, clienteId, clienteNome },
           });
         }
         // Notificar avisos importantes
         else if (codeLog === 'warning') {
           addNotification({
             type: 'warning',
-            title: 'Aviso',
+            title: clienteNome ? `Aviso: ${clienteNome}` : 'Aviso',
             message: log.title || log.acao?.substring(0, 100) || 'Novo aviso',
-            data: log,
+            data: { ...log, clienteId, clienteNome },
           });
         }
       });

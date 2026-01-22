@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
   Check, 
@@ -8,7 +9,9 @@ import {
   AlertCircle, 
   AlertTriangle, 
   Info,
-  Clock
+  Clock,
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,20 +55,32 @@ const formatTimeAgo = (date: Date) => {
 const NotificationItem = ({ 
   notification, 
   onMarkAsRead, 
-  onDelete 
+  onDelete,
+  onNavigate
 }: { 
   notification: Notification;
   onMarkAsRead: (id: string) => void;
   onDelete: (id: string) => void;
+  onNavigate: (notification: Notification) => void;
 }) => {
   const { icon: Icon, color, bg } = getNotificationIcon(notification.type);
+  const clienteId = notification.data?.clienteId || notification.data?.id_cliente;
+  const clienteNome = notification.data?.clienteNome || notification.data?.nome_cliente;
+
+  const handleClick = () => {
+    if (!notification.read) {
+      onMarkAsRead(notification.id);
+    }
+    onNavigate(notification);
+  };
 
   return (
     <div 
       className={cn(
-        "p-3 rounded-lg transition-colors hover:bg-secondary/50 group",
+        "p-3 rounded-lg transition-colors hover:bg-secondary/50 group cursor-pointer",
         !notification.read && "bg-primary/5 border-l-2 border-primary"
       )}
+      onClick={handleClick}
     >
       <div className="flex gap-3">
         <div className={cn("p-2 rounded-lg flex-shrink-0", bg)}>
@@ -86,27 +101,65 @@ const NotificationItem = ({
             </span>
           </div>
           
+          {/* Nome do cliente se disponível */}
+          {clienteNome && (
+            <p className="text-sm font-medium text-foreground mt-0.5 truncate">
+              {clienteNome}
+            </p>
+          )}
+          
+          {/* Documento */}
+          {clienteId && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <Badge variant="secondary" className="font-mono text-xs">
+                <FileText className="h-3 w-3 mr-1" />
+                {clienteId}
+              </Badge>
+            </div>
+          )}
+          
           <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
             {notification.message}
           </p>
           
-          <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 mt-2">
+            {/* Botão de ação principal */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClick();
+              }}
+              className="h-6 px-2 text-xs text-primary hover:text-primary"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              {notification.type === 'new_client' ? 'Ver cliente' : 'Ver logs'}
+            </Button>
+            
+            <div className="flex-1" />
+            
             {!notification.read && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onMarkAsRead(notification.id)}
-                className="h-6 px-2 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMarkAsRead(notification.id);
+                }}
+                className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <Check className="h-3 w-3 mr-1" />
-                Marcar lida
+                <Check className="h-3 w-3" />
               </Button>
             )}
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onDelete(notification.id)}
-              className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(notification.id);
+              }}
+              className="h-6 px-2 text-xs text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -119,7 +172,8 @@ const NotificationItem = ({
 
 export function NotificationsButton() {
   const [open, setOpen] = useState(false);
-  const { 
+  const navigate = useNavigate();
+  const {
     notifications, 
     unreadCount, 
     markAsRead, 
@@ -127,7 +181,20 @@ export function NotificationsButton() {
     clearNotification, 
     clearAll,
     isLoading 
-  } = useNotifications({ pollInterval: 60000 }); // Verifica a cada 1 minuto
+  } = useNotifications({ pollInterval: 60000 });
+
+  const handleNavigate = (notification: Notification) => {
+    setOpen(false);
+    const clienteId = notification.data?.clienteId || notification.data?.id_cliente;
+    
+    if (notification.type === 'new_client' && clienteId) {
+      // Navega para clientes com filtro do documento
+      navigate(`/clientes?search=${encodeURIComponent(clienteId)}`);
+    } else {
+      // Navega para logs com filtro do documento
+      navigate(`/logs?search=${encodeURIComponent(clienteId || '')}`);
+    }
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -204,6 +271,7 @@ export function NotificationsButton() {
                   notification={notification}
                   onMarkAsRead={markAsRead}
                   onDelete={clearNotification}
+                  onNavigate={handleNavigate}
                 />
               ))}
             </div>
