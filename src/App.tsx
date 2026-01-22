@@ -1,8 +1,11 @@
 import Sidebar from "./components/sidebar"
 import Header from "./components/header"
 import { AnimatedOutlet } from "./components/animated-outlet"
+import { ChangelogModal, useChangelog } from "./components/changelog"
 
 function App() {
+  const { showModal, dismissModal } = useChangelog();
+
   return (
     <div className="min-h-screen flex w-full bg-background">
       {/* Sidebar */}
@@ -20,6 +23,9 @@ function App() {
           </div>
         </main>
       </div>
+
+      {/* Changelog Modal */}
+      <ChangelogModal isOpen={showModal} onClose={dismissModal} />
     </div>
   )
 }

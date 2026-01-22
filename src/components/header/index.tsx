@@ -15,9 +15,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { GlobalSearch } from "@/components/global-search";
 import { NotificationsButton } from "@/components/notifications";
+import { ChangelogButton, useChangelog } from "@/components/changelog";
 
 export default function Header() {
   const { logout }: any = useContext(AuthContext);
+  const { openModal, hasNewUpdates } = useChangelog();
 
   const authData: any = localStorage.getItem("auth_user");
   const userData: any = authData ? JSON.parse(authData) : null;
@@ -44,6 +46,7 @@ export default function Header() {
 
       {/* Right - Notifications & Profile */}
       <div className="flex items-center gap-2">
+        <ChangelogButton onClick={openModal} hasNew={hasNewUpdates} />
         <NotificationsButton />
         
         <DropdownMenu>
