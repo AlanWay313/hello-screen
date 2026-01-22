@@ -2,7 +2,6 @@ import { CriarUsuarios } from "@/components/criarusuarios";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -53,7 +52,11 @@ import {
   Mail,
   User,
   Shield,
-  HelpCircle
+  HelpCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -441,6 +444,10 @@ export function Usuarios() {
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
   
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
@@ -502,17 +509,33 @@ export function Usuarios() {
     }
 
     setFilteredData(filtered);
+    setCurrentPage(1); // Reset para primeira página quando filtrar
   }, [data, searchTerm, activeFilter]);
 
   useEffect(() => {
     listarUsuarios();
   }, []);
 
+  // Cálculos de paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, endIndex);
+
   const activeUsers = data.filter(user => user.isActive === 1).length;
   const inactiveUsers = data.filter(user => user.isActive !== 1).length;
 
   const handleRefresh = () => {
     listarUsuarios();
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1);
   };
 
   return (
@@ -756,146 +779,215 @@ export function Usuarios() {
               </div>
             ) : (
               /* Tabela de Usuários */
-              <div className="rounded-xl border border-border overflow-hidden">
-                <Table>
-                  <TableCaption className="py-4">
-                    Mostrando {filteredData.length} de {data.length} usuários
-                  </TableCaption>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 hover:bg-muted/50">
-                      <TableHead className="font-semibold">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          Nome
-                        </div>
-                      </TableHead>
-                      <TableHead className="font-semibold">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          Email
-                        </div>
-                      </TableHead>
-                      <TableHead className="font-semibold">
-                        <div className="flex items-center gap-2">
-                          <Shield className="h-4 w-4" />
-                          Usuário
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-center font-semibold">Status</TableHead>
-                      <TableHead className="text-right font-semibold">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredData.map((user) => (
-                      <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-sm font-semibold text-primary">
-                                {user.name?.charAt(0)?.toUpperCase() || "?"}
-                              </span>
-                            </div>
-                            <span className="font-medium text-foreground">{user.name}</span>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead className="font-semibold">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            Nome
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <a 
-                            href={`mailto:${user.email}`}
-                            className="text-primary hover:text-primary/80 hover:underline transition-colors"
-                          >
-                            {user.email}
-                          </a>
-                        </TableCell>
-                        <TableCell>
-                          <code className="relative rounded-md bg-muted px-2 py-1 font-mono text-sm">
-                            {user.username}
-                          </code>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge 
-                                variant="outline"
-                                className={user.isActive === 1 
-                                  ? "bg-success/10 text-success border-success/20 cursor-help" 
-                                  : "bg-destructive/10 text-destructive border-destructive/20 cursor-help"
-                                }
-                              >
-                                {user.isActive === 1 ? (
-                                  <>
-                                    <UserCheck className="h-3 w-3 mr-1" />
-                                    Ativo
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserX className="h-3 w-3 mr-1" />
-                                    Inativo
-                                  </>
-                                )}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>
-                                {user.isActive === 1 
-                                  ? "Este usuário pode acessar o sistema" 
-                                  : "Este usuário está desativado"
-                                }
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
+                        </TableHead>
+                        <TableHead className="font-semibold">
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            Email
+                          </div>
+                        </TableHead>
+                        <TableHead className="font-semibold">
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Usuário
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-center font-semibold">Status</TableHead>
+                        <TableHead className="text-right font-semibold">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedData.map((user) => (
+                        <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="text-sm font-semibold text-primary">
+                                  {user.name?.charAt(0)?.toUpperCase() || "?"}
+                                </span>
+                              </div>
+                              <span className="font-medium text-foreground">{user.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <a 
+                              href={`mailto:${user.email}`}
+                              className="text-primary hover:text-primary/80 hover:underline transition-colors"
+                            >
+                              {user.email}
+                            </a>
+                          </TableCell>
+                          <TableCell>
+                            <code className="relative rounded-md bg-muted px-2 py-1 font-mono text-sm">
+                              {user.username}
+                            </code>
+                          </TableCell>
+                          <TableCell className="text-center">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-8 w-8 hover:bg-muted"
-                                  >
-                                    <EllipsisVertical className="h-4 w-4" />
-                                    <span className="sr-only">Abrir menu de ações</span>
-                                  </Button>
-                                </DropdownMenuTrigger>
+                                <Badge 
+                                  variant="outline"
+                                  className={user.isActive === 1 
+                                    ? "bg-success/10 text-success border-success/20 cursor-help" 
+                                    : "bg-destructive/10 text-destructive border-destructive/20 cursor-help"
+                                  }
+                                >
+                                  {user.isActive === 1 ? (
+                                    <>
+                                      <UserCheck className="h-3 w-3 mr-1" />
+                                      Ativo
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserX className="h-3 w-3 mr-1" />
+                                      Inativo
+                                    </>
+                                  )}
+                                </Badge>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Ações do usuário</p>
+                                <p>
+                                  {user.isActive === 1 
+                                    ? "Este usuário pode acessar o sistema" 
+                                    : "Este usuário está desativado"
+                                  }
+                                </p>
                               </TooltipContent>
                             </Tooltip>
-                            <DropdownMenuContent className="w-56 bg-popover border border-border" align="end">
-                              <DropdownMenuLabel className="flex items-center gap-2">
-                                <User className="h-4 w-4" />
-                                Ações do usuário
-                              </DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuGroup>
-                                <DropdownMenuItem 
-                                  onClick={() => openEditModal(user)}
-                                  className="cursor-pointer"
-                                >
-                                  <Pencil className="mr-2 h-4 w-4 text-primary" />
-                                  Editar usuário
-                                </DropdownMenuItem>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-muted"
+                                    >
+                                      <EllipsisVertical className="h-4 w-4" />
+                                      <span className="sr-only">Abrir menu de ações</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Ações do usuário</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <DropdownMenuContent className="w-56 bg-popover border border-border" align="end">
+                                <DropdownMenuLabel className="flex items-center gap-2">
+                                  <User className="h-4 w-4" />
+                                  Ações do usuário
+                                </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onSelect={(e) => e.preventDefault()}
-                                  className="text-destructive focus:text-destructive cursor-pointer"
-                                >
-                                  <Trash className="mr-2 h-4 w-4" />
-                                  <DeletarUsuario 
-                                    idUser={user.id} 
-                                    listarUsuarios={listarUsuarios}
-                                  />
-                                </DropdownMenuItem>
-                              </DropdownMenuGroup>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                                <DropdownMenuGroup>
+                                  <DropdownMenuItem 
+                                    onClick={() => openEditModal(user)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Pencil className="mr-2 h-4 w-4 text-primary" />
+                                    Editar usuário
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="text-destructive focus:text-destructive cursor-pointer"
+                                  >
+                                    <Trash className="mr-2 h-4 w-4" />
+                                    <DeletarUsuario 
+                                      idUser={user.id} 
+                                      listarUsuarios={listarUsuarios}
+                                    />
+                                  </DropdownMenuItem>
+                                </DropdownMenuGroup>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Controles de Paginação */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Mostrando</span>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={handleItemsPerPageChange}
+                    >
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span>de {filteredData.length} usuários</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Página {currentPage} de {totalPages || 1}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handlePageChange(1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                        <span className="sr-only">Primeira página</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="sr-only">Página anterior</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage >= totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                        <span className="sr-only">Próxima página</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handlePageChange(totalPages)}
+                        disabled={currentPage >= totalPages}
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                        <span className="sr-only">Última página</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
