@@ -30,4 +30,4 @@ export default function Financeiro(){
              </div>
         </div>
     )
-}2
+}
