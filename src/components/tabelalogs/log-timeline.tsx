@@ -11,7 +11,9 @@ import {
   Eye,
   Copy,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Flame,
+  Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,17 +43,8 @@ const getStatusConfig = (status: string) => {
         text: 'text-destructive', 
         icon: AlertCircle,
         label: 'Erro',
-        glow: 'shadow-destructive/20'
-      };
-    case 'success':
-      return { 
-        gradient: 'from-success to-success/70',
-        bg: 'bg-success/10',
-        border: 'border-success/30',
-        text: 'text-success', 
-        icon: CheckCircle,
-        label: 'Sucesso',
-        glow: 'shadow-success/20'
+        glow: 'shadow-destructive/20',
+        priority: 3
       };
     case 'warning':
       return { 
@@ -61,7 +54,19 @@ const getStatusConfig = (status: string) => {
         text: 'text-warning', 
         icon: AlertTriangle,
         label: 'Aviso',
-        glow: 'shadow-warning/20'
+        glow: 'shadow-warning/20',
+        priority: 2
+      };
+    case 'success':
+      return { 
+        gradient: 'from-success to-success/70',
+        bg: 'bg-success/10',
+        border: 'border-success/30',
+        text: 'text-success', 
+        icon: CheckCircle,
+        label: 'Sucesso',
+        glow: 'shadow-success/20',
+        priority: 1
       };
     case 'info':
       return { 
@@ -71,7 +76,8 @@ const getStatusConfig = (status: string) => {
         text: 'text-primary', 
         icon: Info,
         label: 'Info',
-        glow: 'shadow-primary/20'
+        glow: 'shadow-primary/20',
+        priority: 0
       };
     default:
       return { 
@@ -81,7 +87,8 @@ const getStatusConfig = (status: string) => {
         text: 'text-muted-foreground', 
         icon: Activity,
         label: status || 'Log',
-        glow: 'shadow-muted/20'
+        glow: 'shadow-muted/20',
+        priority: 0
       };
   }
 };
@@ -91,6 +98,51 @@ const formatTime = (dateString: string) => {
   return date.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
+  });
+};
+
+const isRecent = (dateString: string, hoursAgo: number = 2) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  return diffHours <= hoursAgo;
+};
+
+const getTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  
+  if (diffMinutes < 1) return 'agora';
+  if (diffMinutes < 60) return `há ${diffMinutes}min`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `há ${diffHours}h`;
+  return formatTime(dateString);
+};
+
+// Prioriza erros e avisos recentes
+const prioritizeLogs = (logs: LogData[]) => {
+  return [...logs].sort((a, b) => {
+    const aRecent = isRecent(a.created_at);
+    const bRecent = isRecent(b.created_at);
+    const aConfig = getStatusConfig(a.codeLog);
+    const bConfig = getStatusConfig(b.codeLog);
+    
+    // Primeiro: erros/avisos recentes
+    if (aRecent && !bRecent && aConfig.priority >= 2) return -1;
+    if (bRecent && !aRecent && bConfig.priority >= 2) return 1;
+    
+    // Segundo: por prioridade se ambos recentes
+    if (aRecent && bRecent) {
+      if (aConfig.priority !== bConfig.priority) {
+        return bConfig.priority - aConfig.priority;
+      }
+    }
+    
+    // Terceiro: por data
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 };
 
@@ -110,7 +162,7 @@ const groupByDate = (logs: LogData[]) => {
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([date, logs]) => ({
       date,
-      logs: logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      logs: prioritizeLogs(logs)
     }));
 };
 
@@ -118,17 +170,20 @@ const TimelineItem = ({
   log, 
   index, 
   onViewDetails,
-  isLast 
+  isLast,
+  isPriority
 }: { 
   log: LogData; 
   index: number;
   onViewDetails: (log: LogData) => void;
   isLast: boolean;
+  isPriority: boolean;
 }) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(isPriority);
   const [copied, setCopied] = React.useState(false);
   const config = getStatusConfig(log.codeLog);
   const Icon = config.icon;
+  const recent = isRecent(log.created_at);
 
   const copyToClipboard = async () => {
     try {
@@ -144,7 +199,7 @@ const TimelineItem = ({
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.3 }}
+      transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.3 }}
       className="relative flex gap-4 group"
     >
       {/* Timeline line */}
@@ -155,27 +210,49 @@ const TimelineItem = ({
       {/* Timeline dot */}
       <div className="relative z-10 flex-shrink-0">
         <motion.div 
-          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-lg ${config.glow}`}
+          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-lg ${config.glow} ${isPriority ? 'ring-2 ring-offset-2 ring-offset-background ring-destructive/50' : ''}`}
           whileHover={{ scale: 1.1 }}
           transition={{ type: "spring", stiffness: 400 }}
+          animate={isPriority ? { scale: [1, 1.05, 1] } : {}}
         >
           <Icon className="h-5 w-5 text-white" />
         </motion.div>
+        {isPriority && (
+          <motion.div 
+            className="absolute -top-1 -right-1 p-1 bg-destructive rounded-full"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Flame className="h-2.5 w-2.5 text-white" />
+          </motion.div>
+        )}
       </div>
       
       {/* Content */}
-      <Card className={`flex-1 mb-4 overflow-hidden border ${config.border} bg-card/50 backdrop-blur-sm hover:shadow-md transition-all duration-300 group-hover:border-primary/30`}>
+      <Card className={`flex-1 mb-4 overflow-hidden border ${config.border} ${isPriority ? 'bg-destructive/5 border-destructive/40 shadow-md' : 'bg-card/50'} backdrop-blur-sm hover:shadow-md transition-all duration-300 group-hover:border-primary/30`}>
         <div className="p-4">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Badge variant="outline" className={`${config.bg} ${config.text} border-transparent font-medium`}>
                   {config.label}
                 </Badge>
                 <Badge variant="secondary" className="font-mono text-xs">
                   {log.id_cliente}
                 </Badge>
+                {isPriority && (
+                  <Badge className="bg-destructive/90 text-destructive-foreground text-xs gap-1">
+                    <Flame className="h-3 w-3" />
+                    Atenção
+                  </Badge>
+                )}
+                {recent && !isPriority && (
+                  <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                    Recente
+                  </Badge>
+                )}
               </div>
               <h4 className="font-semibold text-foreground truncate" title={log.title}>
                 {log.title}
@@ -184,7 +261,9 @@ const TimelineItem = ({
             
             <div className="flex items-center gap-2 flex-shrink-0">
               <div className="text-right">
-                <p className="text-sm font-medium text-foreground">{formatTime(log.created_at)}</p>
+                <p className={`text-sm font-medium ${recent ? 'text-primary' : 'text-foreground'}`}>
+                  {recent ? getTimeAgo(log.created_at) : formatTime(log.created_at)}
+                </p>
               </div>
             </div>
           </div>
@@ -220,13 +299,13 @@ const TimelineItem = ({
           {/* Actions */}
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50">
             <Button
-              variant="outline"
+              variant={isPriority ? "default" : "outline"}
               size="sm"
               onClick={() => onViewDetails(log)}
               className="h-8 gap-1.5 text-xs"
             >
               <Eye className="h-3.5 w-3.5" />
-              Detalhes
+              Ver Detalhes
             </Button>
             <Button
               variant="ghost"
@@ -253,7 +332,7 @@ const TimelineItem = ({
   );
 };
 
-const DateHeader = ({ date, count }: { date: string; count: number }) => {
+const DateHeader = ({ date, count, criticalCount }: { date: string; count: number; criticalCount: number }) => {
   const dateObj = new Date(date + 'T12:00:00');
   const today = new Date();
   const yesterday = new Date(today);
@@ -286,18 +365,102 @@ const DateHeader = ({ date, count }: { date: string; count: number }) => {
       <Badge variant="secondary" className="font-medium">
         {count} {count === 1 ? 'evento' : 'eventos'}
       </Badge>
+      {criticalCount > 0 && (
+        <Badge className="bg-destructive/90 text-destructive-foreground gap-1">
+          <AlertCircle className="h-3 w-3" />
+          {criticalCount} crítico{criticalCount !== 1 ? 's' : ''}
+        </Badge>
+      )}
       <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent" />
     </motion.div>
   );
 };
 
-export function LogTimeline({ data, onViewDetails }: LogTimelineProps) {
-  const groupedLogs = React.useMemo(() => groupByDate(data), [data]);
-  const [visibleGroups, setVisibleGroups] = React.useState(3);
+// Alerta de erros recentes no topo
+const RecentAlertsHeader = ({ alerts }: { alerts: LogData[] }) => {
+  if (alerts.length === 0) return null;
 
-  const loadMore = () => {
-    setVisibleGroups(prev => prev + 3);
-  };
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6 p-4 bg-gradient-to-r from-destructive/10 via-warning/10 to-transparent rounded-xl border border-destructive/30"
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 bg-destructive/20 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-foreground">Atenção Necessária</h3>
+          <p className="text-sm text-muted-foreground">
+            {alerts.length} {alerts.length === 1 ? 'erro ou aviso recente requer' : 'erros ou avisos recentes requerem'} sua atenção
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+export function LogTimeline({ data, onViewDetails }: LogTimelineProps) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [visibleItems, setVisibleItems] = React.useState(15);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  
+  // Processar e agrupar logs
+  const groupedLogs = React.useMemo(() => groupByDate(data), [data]);
+  
+  // Flatten para infinite scroll
+  const allItems = React.useMemo(() => {
+    const items: { type: 'header' | 'log'; data: any; date?: string; criticalCount?: number }[] = [];
+    
+    groupedLogs.forEach(group => {
+      const criticalCount = group.logs.filter(log => {
+        const config = getStatusConfig(log.codeLog);
+        return config.priority >= 2 && isRecent(log.created_at);
+      }).length;
+      
+      items.push({ type: 'header', data: group.date, date: group.date, criticalCount });
+      group.logs.forEach(log => {
+        items.push({ type: 'log', data: log, date: group.date });
+      });
+    });
+    
+    return items;
+  }, [groupedLogs]);
+
+  // Alertas recentes (erros/avisos das últimas 2 horas)
+  const recentAlerts = React.useMemo(() => {
+    return data.filter(log => {
+      const config = getStatusConfig(log.codeLog);
+      return config.priority >= 2 && isRecent(log.created_at);
+    });
+  }, [data]);
+
+  // Infinite scroll com Intersection Observer
+  React.useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleItems < allItems.length) {
+          setIsLoadingMore(true);
+          setTimeout(() => {
+            setVisibleItems(prev => Math.min(prev + 10, allItems.length));
+            setIsLoadingMore(false);
+          }, 300);
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    const sentinel = document.getElementById('timeline-sentinel');
+    if (sentinel) observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, [visibleItems, allItems.length]);
+
+  // Reset quando dados mudam
+  React.useEffect(() => {
+    setVisibleItems(15);
+  }, [data]);
 
   if (data.length === 0) {
     return (
@@ -311,44 +474,81 @@ export function LogTimeline({ data, onViewDetails }: LogTimelineProps) {
     );
   }
 
-  const displayedGroups = groupedLogs.slice(0, visibleGroups);
-  const hasMore = visibleGroups < groupedLogs.length;
+  const displayedItems = allItems.slice(0, visibleItems);
+  const hasMore = visibleItems < allItems.length;
+
+  // Rastrear índice por grupo para animação
+  let currentGroupIndex = 0;
 
   return (
-    <div className="relative">
-      <AnimatePresence mode="wait">
-        {displayedGroups.map((group, groupIndex) => (
-          <div key={group.date}>
-            <DateHeader date={group.date} count={group.logs.length} />
-            <div className="ml-1">
-              {group.logs.map((log, index) => (
-                <TimelineItem
-                  key={`${log.id_cliente}-${log.created_at}-${index}`}
-                  log={log}
-                  index={index}
-                  onViewDetails={onViewDetails}
-                  isLast={groupIndex === displayedGroups.length - 1 && index === group.logs.length - 1}
-                />
-              ))}
+    <div className="relative" ref={containerRef}>
+      {/* Alertas recentes no topo */}
+      <RecentAlertsHeader alerts={recentAlerts} />
+
+      <AnimatePresence mode="sync">
+        {displayedItems.map((item, idx) => {
+          if (item.type === 'header') {
+            currentGroupIndex = 0;
+            const logsInGroup = groupedLogs.find(g => g.date === item.date)?.logs || [];
+            return (
+              <DateHeader 
+                key={`header-${item.data}`} 
+                date={item.data} 
+                count={logsInGroup.length}
+                criticalCount={item.criticalCount || 0}
+              />
+            );
+          }
+          
+          const log = item.data as LogData;
+          const config = getStatusConfig(log.codeLog);
+          const isPriority = config.priority >= 2 && isRecent(log.created_at);
+          const isLastInGroup = idx === displayedItems.length - 1 || displayedItems[idx + 1]?.type === 'header';
+          
+          const itemIndex = currentGroupIndex;
+          currentGroupIndex++;
+
+          return (
+            <div key={`log-${log.id_cliente}-${log.created_at}-${idx}`} className="ml-1">
+              <TimelineItem
+                log={log}
+                index={itemIndex}
+                onViewDetails={onViewDetails}
+                isLast={isLastInGroup && !hasMore}
+                isPriority={isPriority}
+              />
             </div>
-          </div>
-        ))}
+          );
+        })}
       </AnimatePresence>
 
-      {hasMore && (
+      {/* Sentinel para infinite scroll */}
+      <div id="timeline-sentinel" className="h-4" />
+
+      {/* Loading indicator */}
+      {isLoadingMore && (
         <motion.div 
-          className="flex justify-center pt-4"
+          className="flex justify-center py-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
-          <Button
-            variant="outline"
-            onClick={loadMore}
-            className="gap-2"
-          >
-            <ChevronDown className="h-4 w-4" />
-            Carregar mais ({groupedLogs.length - visibleGroups} dias restantes)
-          </Button>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Carregando mais...</span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Info de quantos restam */}
+      {hasMore && !isLoadingMore && (
+        <motion.div 
+          className="flex justify-center pt-2 pb-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <span className="text-xs text-muted-foreground">
+            Role para ver mais ({allItems.length - visibleItems} itens restantes)
+          </span>
         </motion.div>
       )}
     </div>
