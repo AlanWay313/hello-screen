@@ -1,7 +1,10 @@
 import { toast } from "@/hooks/use-toast";
 import api from "@/services/api";
 import { useState } from "react";
-import { X, CheckCircle } from "lucide-react";
+import { X, CheckCircle, KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface AlterarSenhaModalProps {
   userId: number;
@@ -11,33 +14,53 @@ interface AlterarSenhaModalProps {
 
 export function AlterarSenhaModal({ userId, isOpen, onClose }: AlterarSenhaModalProps) {
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+
+  const validatePassword = () => {
+    if (password.length < 6) {
+      setError("A senha deve ter pelo menos 6 caracteres");
+      return false;
+    }
+    if (password !== confirmPassword) {
+      setError("As senhas não coincidem");
+      return false;
+    }
+    setError("");
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!validatePassword()) return;
+
     setLoading(true);
 
     try {
-       await api.put("/src/services/AlterarSenha.php", {
+      await api.put("/src/services/AlterarSenha.php", {
         id: userId,
         password: password,
       });
 
       toast({
-        title: "Alterar senha",
-        description: `sua senha foi alterada com sucesso!`,
+        title: "Senha alterada",
+        description: "Sua senha foi alterada com sucesso!",
       });
-    
+
       setPassword("");
-      setSuccess(true); // Mostra tela de sucesso
+      setConfirmPassword("");
+      setSuccess(true);
     } catch (error: any) {
       const msg = error.response?.data?.message || "Erro ao alterar senha.";
 
-       toast({
-        title: "Alterar senha",
+      toast({
+        title: "Erro",
         description: msg,
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -47,6 +70,8 @@ export function AlterarSenhaModal({ userId, isOpen, onClose }: AlterarSenhaModal
   const handleClose = () => {
     setSuccess(false);
     setPassword("");
+    setConfirmPassword("");
+    setError("");
     onClose();
   };
 
@@ -59,71 +84,136 @@ export function AlterarSenhaModal({ userId, isOpen, onClose }: AlterarSenhaModal
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg relative">
-        {/* Botão X para fechar */}
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-          disabled={loading}
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Tela de Sucesso */}
-        {success ? (
-          <div className="text-center py-4">
-            <div className="mb-4 flex justify-center">
-              <CheckCircle className="w-16 h-16 text-green-500" />
+      <div className="bg-card border border-border rounded-2xl shadow-elevated w-full max-w-md overflow-hidden animate-scale-in">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary/10 rounded-xl">
+              <KeyRound className="h-5 w-5 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold mb-2 text-green-600">Senha Alterada!</h2>
-            <p className="text-gray-600 mb-6">Sua senha foi alterada com sucesso.</p>
-            <button
-              onClick={handleClose}
-              className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-            >
-              Concluído
-            </button>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Alterar Senha</h2>
+              <p className="text-sm text-muted-foreground">Defina uma nova senha segura</p>
+            </div>
           </div>
-        ) : (
-          /* Formulário de Alteração */
-          <>
-            <h2 className="text-xl font-semibold mb-4">Alterar minha senha</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            disabled={loading}
+            className="rounded-lg"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-            <form onSubmit={handleSubmit}>
-              <label className="block mb-2 font-medium">Nova senha</label>
-              <input
-                type="password"
-                className="w-full p-2 border rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
+        {/* Content */}
+        <div className="p-6">
+          {success ? (
+            <div className="text-center py-6">
+              <div className="mb-4 flex justify-center">
+                <div className="p-4 bg-success/10 rounded-full">
+                  <CheckCircle className="w-12 h-12 text-success" />
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold text-foreground mb-2">
+                Senha Alterada!
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                Sua senha foi alterada com sucesso.
+              </p>
+              <Button onClick={handleClose} className="w-full">
+                Concluído
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nova senha</Label>
+                <div className="relative">
+                  <Input
+                    id="new-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="Digite sua nova senha"
+                    required
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
 
-              <div className="flex justify-end space-x-2">
-                <button
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirmar senha</Label>
+                <Input
+                  id="confirm-password"
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="Confirme sua nova senha"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-lg">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
                   type="button"
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 transition-colors"
+                  variant="outline"
                   onClick={handleClose}
                   disabled={loading}
+                  className="flex-1"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading}
+                  disabled={loading || !password || !confirmPassword}
+                  className="flex-1"
                 >
-                  {loading ? "Salvando..." : "Salvar"}
-                </button>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando
+                    </>
+                  ) : (
+                    "Salvar senha"
+                  )}
+                </Button>
               </div>
             </form>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
