@@ -56,9 +56,9 @@ export function Dashboard() {
           filename = 'clientes_ativos';
           break;
         case 'inativos':
-          // Inativos: status vazio (sem contrato)
+          // Inativos: sem contrato (ole_contract_number vazio)
           filteredClientes = clientes.filter((c: any) => 
-            !c.voalle_contract_status || c.voalle_contract_status.trim() === ''
+            !c.ole_contract_number || c.ole_contract_number.toString().trim() === ''
           );
           filename = 'clientes_inativos';
           break;
