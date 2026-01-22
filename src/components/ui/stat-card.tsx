@@ -1,5 +1,5 @@
 import * as React from "react"
-import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, Info, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -16,6 +16,8 @@ interface StatCardProps {
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'destructive'
   className?: string
   isLoading?: boolean
+  actionButton?: React.ReactNode
+  onViewClick?: () => void
 }
 
 const variantStyles = {
@@ -56,6 +58,8 @@ export function StatCard({
   variant = 'default',
   className,
   isLoading = false,
+  actionButton,
+  onViewClick,
 }: StatCardProps) {
   const styles = variantStyles[variant]
   
@@ -117,15 +121,29 @@ export function StatCard({
             </div>
           </div>
 
-          {trend && (
-            <div className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-              getTrendColor()
-            )}>
-              {getTrendIcon()}
-              <span>{Math.abs(trend.value)}%</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {trend && (
+              <div className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
+                getTrendColor()
+              )}>
+                {getTrendIcon()}
+                <span>{Math.abs(trend.value)}%</span>
+              </div>
+            )}
+            
+            {onViewClick && (
+              <button
+                onClick={onViewClick}
+                className="p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                title="Ver detalhes"
+              >
+                <Eye className="h-4 w-4" />
+              </button>
+            )}
+            
+            {actionButton}
+          </div>
         </div>
 
         <div className="flex items-end justify-between">

@@ -5,6 +5,8 @@ import useIntegrador from "@/hooks/use-integrador"
 import { TotalClienteDash } from "@/services/totalclientes"
 import { ClientesCanceladosApi } from "@/services/clientesCancelados"
 import { DashboardFilters } from "./dashboard-filters-context"
+import { CanceladosModal } from "./modals/cancelados-modal"
+import { InativosModal } from "./modals/inativos-modal"
 
 interface Stats {
   total: number
@@ -25,6 +27,8 @@ export function StatsOverview({ filters }: StatsOverviewProps) {
     cancelados: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [canceladosModalOpen, setCanceladosModalOpen] = useState(false)
+  const [inativosModalOpen, setInativosModalOpen] = useState(false)
   const integrador = useIntegrador()
 
   useEffect(() => {
@@ -79,57 +83,71 @@ export function StatsOverview({ filters }: StatsOverviewProps) {
   const showCancelados = showAll || filters?.status === "cancelados"
 
   return (
-    <div className={`grid grid-cols-1 gap-4 ${
-      showAll ? 'sm:grid-cols-2 lg:grid-cols-4' : 
-      'sm:grid-cols-2 lg:grid-cols-3'
-    }`}>
-      {showAll && (
-        <StatCard
-          title="Total de Clientes"
-          description="Cadastrados na base"
-          tooltip="Soma de todos os clientes registrados no sistema, independente do status do contrato"
-          value={stats.total}
-          icon={<Users className="h-6 w-6" />}
-          variant="primary"
-          isLoading={isLoading}
-        />
-      )}
-      
-      {showAtivos && (
-        <StatCard
-          title="Clientes Ativos"
-          description="Possuem contrato ativo"
-          tooltip="Clientes que possuem um contrato ativo na integração e podem acessar os serviços"
-          value={stats.ativos}
-          icon={<UserCheck className="h-6 w-6" />}
-          variant="success"
-          isLoading={isLoading}
-        />
-      )}
-      
-      {showInativos && (
-        <StatCard
-          title="Clientes Inativos"
-          description="Sem contrato na integração"
-          tooltip="Clientes cadastrados na base mas que não possuem um contrato ativo vinculado"
-          value={stats.inativos}
-          icon={<UserX className="h-6 w-6" />}
-          variant="warning"
-          isLoading={isLoading}
-        />
-      )}
-      
-      {showCancelados && (
-        <StatCard
-          title="Cancelados"
-          description="Contratos cancelados"
-          tooltip="Clientes que tiveram seus contratos cancelados e não utilizam mais os serviços"
-          value={stats.cancelados}
-          icon={<XCircle className="h-6 w-6" />}
-          variant="destructive"
-          isLoading={isLoading}
-        />
-      )}
-    </div>
+    <>
+      <div className={`grid grid-cols-1 gap-4 ${
+        showAll ? 'sm:grid-cols-2 lg:grid-cols-4' : 
+        'sm:grid-cols-2 lg:grid-cols-3'
+      }`}>
+        {showAll && (
+          <StatCard
+            title="Total de Clientes"
+            description="Cadastrados na base"
+            tooltip="Soma de todos os clientes registrados no sistema, independente do status do contrato"
+            value={stats.total}
+            icon={<Users className="h-6 w-6" />}
+            variant="primary"
+            isLoading={isLoading}
+          />
+        )}
+        
+        {showAtivos && (
+          <StatCard
+            title="Clientes Ativos"
+            description="Possuem contrato ativo"
+            tooltip="Clientes que possuem um contrato ativo na integração e podem acessar os serviços"
+            value={stats.ativos}
+            icon={<UserCheck className="h-6 w-6" />}
+            variant="success"
+            isLoading={isLoading}
+          />
+        )}
+        
+        {showInativos && (
+          <StatCard
+            title="Clientes Inativos"
+            description="Sem contrato na integração"
+            tooltip="Clientes cadastrados na base mas que não possuem um contrato ativo vinculado. Clique no ícone para ver detalhes e reintegrar."
+            value={stats.inativos}
+            icon={<UserX className="h-6 w-6" />}
+            variant="warning"
+            isLoading={isLoading}
+            onViewClick={() => setInativosModalOpen(true)}
+          />
+        )}
+        
+        {showCancelados && (
+          <StatCard
+            title="Cancelados"
+            description="Contratos cancelados"
+            tooltip="Clientes que tiveram seus contratos cancelados e não utilizam mais os serviços. Clique no ícone para ver a lista completa."
+            value={stats.cancelados}
+            icon={<XCircle className="h-6 w-6" />}
+            variant="destructive"
+            isLoading={isLoading}
+            onViewClick={() => setCanceladosModalOpen(true)}
+          />
+        )}
+      </div>
+
+      {/* Modais */}
+      <CanceladosModal 
+        open={canceladosModalOpen} 
+        onOpenChange={setCanceladosModalOpen} 
+      />
+      <InativosModal 
+        open={inativosModalOpen} 
+        onOpenChange={setInativosModalOpen} 
+      />
+    </>
   )
 }
