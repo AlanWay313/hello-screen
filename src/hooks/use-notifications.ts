@@ -63,23 +63,49 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     setNotifications(toSave);
   }, []);
 
-  // Adicionar nova notificação
-  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotif: Notification = {
-      ...notification,
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date(),
-      read: false,
-    };
+  // Verificar se já existe notificação similar recente (deduplicação)
+  const isDuplicateNotification = useCallback((
+    notifications: Notification[], 
+    clienteId: string, 
+    type: string
+  ): boolean => {
+    if (!clienteId) return false;
     
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutos
+    
+    return notifications.some(n => {
+      const notifClienteId = n.data?.clienteId || n.data?.id_cliente || '';
+      const isSameClient = notifClienteId === clienteId;
+      const isSameType = n.type === type;
+      const isRecent = n.timestamp > fiveMinutesAgo;
+      
+      return isSameClient && isSameType && isRecent;
+    });
+  }, []);
+
+  // Adicionar nova notificação (com deduplicação)
+  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    const clienteId = notification.data?.clienteId || notification.data?.id_cliente || '';
+    
+    // Verificar duplicatas antes de adicionar
     setNotifications(prev => {
+      if (isDuplicateNotification(prev, clienteId, notification.type)) {
+        return prev; // Não adiciona se for duplicata
+      }
+      
+      const newNotif: Notification = {
+        ...notification,
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date(),
+        read: false,
+      };
+      
       const updated = [newNotif, ...prev];
       saveNotifications(updated);
       return updated;
     });
-
-    return newNotif;
-  }, [saveNotifications]);
+  }, [saveNotifications, isDuplicateNotification]);
 
   // Marcar como lida
   const markAsRead = useCallback((id: string) => {
