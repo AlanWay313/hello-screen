@@ -73,7 +73,7 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Loading } from "../loading";
+import { LogsPageSkeleton } from "@/components/ui/skeleton";
 import api from "@/services/api";
 import useIntegrador from "@/hooks/use-integrador";
 import { useCachedData } from "@/hooks/use-cached-data";
@@ -892,7 +892,7 @@ export function TabelaLogs() {
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalRows = table.getFilteredRowModel().rows.length;
 
-  if (isLoading && !data) return <Loading />;
+  if (isLoading && !data) return <LogsPageSkeleton />;
 
   return (
     <div className="space-y-6">

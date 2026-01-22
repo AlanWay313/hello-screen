@@ -5,7 +5,7 @@ import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carouse
 
 import img1 from '@/assets/img3.jpg';
 import img2 from '@/assets/im2.jpg';
-import { Loading } from "../loading";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function Carrousel() {
   const plugin = React.useRef(
@@ -50,11 +50,9 @@ export function Carrousel() {
                 <Card className="w-full h-full border-none shadow-none">
                   <CardContent className="flex flex-col items-center justify-center p-0 h-full border-none shadow-none">
 
-                    {/* Exibir loading enquanto a imagem não carrega */}
+                    {/* Exibir skeleton enquanto a imagem não carrega */}
                     {loadingImages[index] && (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Loading />
-                      </div>
+                      <Skeleton className="w-full h-64 rounded-lg" />
                     )}
 
                     <img

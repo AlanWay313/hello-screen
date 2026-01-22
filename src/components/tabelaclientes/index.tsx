@@ -16,7 +16,7 @@ import { useCachedData } from "@/hooks/use-cached-data"
 import ResetSenha from "../resetsenha"
 import EditarCliente from "../editarcliente"
 import ReintegrarCliente from "../reintegrarcliente"
-import { Loading } from "../loading"
+import { ClientesPageSkeleton } from "@/components/ui/skeleton"
 import api from "@/services/api"
 
 interface Cliente {
@@ -291,7 +291,7 @@ export function TabelaDeClientes() {
   }
 
   if (isLoading && !data) {
-    return <Loading />
+    return <ClientesPageSkeleton />
   }
 
   if (error) {
