@@ -5,11 +5,11 @@ import {
   ClipboardList, 
   User, 
   LogOut,
-  ChevronDown,
-  Sparkles,
   Moon,
   Sun,
-  Monitor
+  Monitor,
+  Settings,
+  ChevronRight
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "@/contexts/Auth";
@@ -17,12 +17,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
 } from "../ui/dropdown-menu";
 import { useTheme } from "@/hooks/use-theme";
 import { Button } from "../ui/button";
+import logo from '../../../public/logo.jpeg';
+import logoOletv from '@/assets/logo-oletv.png';
 
 export default function Sidebar() {
   const { logout }: any = useContext(AuthContext);
@@ -32,9 +32,6 @@ export default function Sidebar() {
   const authData: any = localStorage.getItem("auth_user");
   const userData: any = authData ? JSON.parse(authData) : null;
 
-  const documento = userData?.documento || userData?.email;
-  const name = userData?.name || "Usuário";
-  const email = userData?.email || documento;
   const isAdmin = userData ? Number(userData.isAdmin) : 0;
 
   const navigationItems = [
@@ -42,7 +39,7 @@ export default function Sidebar() {
       icon: LayoutDashboard, 
       name: "Dashboard", 
       link: "/",
-      description: "Visão geral"
+      description: "Visão geral do sistema"
     },
     { 
       icon: Users, 
@@ -62,82 +59,53 @@ export default function Sidebar() {
       link: "/usuarios",
       description: "Gerenciar usuários"
     }] : []),
+  ];
+
+  const bottomItems = [
     { 
       icon: User, 
       name: "Minha Conta", 
       link: "/conta",
       description: "Perfil e configurações"
     },
+    { 
+      icon: Settings, 
+      name: "Configurações", 
+      link: "/configuracoes",
+      description: "Preferências do sistema"
+    },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   const ThemeIcon = isDark ? Moon : Sun;
 
   return (
-    <aside className="w-[280px] h-screen bg-card border-r border-border flex flex-col fixed left-0 top-0 z-50">
+    <aside className="w-[260px] h-screen bg-slate-900 flex flex-col fixed left-0 top-0 z-50">
       {/* Logo Header */}
-      <div className="p-5 border-b border-border">
+      <div className="p-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
-            <Sparkles className="w-5 h-5 text-primary-foreground" />
+          <div className="w-9 h-9 rounded-lg overflow-hidden bg-white/10">
+            <img src={logo} alt="SysProv" className="w-full h-full object-cover" />
           </div>
-          <div className="flex-1">
-            <h1 className="text-base font-bold text-foreground">Frionline</h1>
-            <p className="text-xs text-muted-foreground">Sysprov Integração</p>
+          <span className="text-slate-500 text-sm">+</span>
+          <div className="w-9 h-9 rounded-lg overflow-hidden bg-white/90 flex items-center justify-center p-1">
+            <img src={logoOletv} alt="Olé TV" className="w-full h-full object-contain" />
           </div>
-          
-          {/* Theme Toggle */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-9 w-9 rounded-lg hover:bg-secondary"
-              >
-                <ThemeIcon className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40 bg-popover border border-border z-50">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Tema</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => setTheme("light")}
-                className={`gap-2 cursor-pointer ${theme === 'light' ? 'bg-secondary' : ''}`}
-              >
-                <Sun className="h-4 w-4" />
-                Claro
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setTheme("dark")}
-                className={`gap-2 cursor-pointer ${theme === 'dark' ? 'bg-secondary' : ''}`}
-              >
-                <Moon className="h-4 w-4" />
-                Escuro
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setTheme("system")}
-                className={`gap-2 cursor-pointer ${theme === 'system' ? 'bg-secondary' : ''}`}
-              >
-                <Monitor className="h-4 w-4" />
-                Sistema
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        </div>
+        <div className="mt-3">
+          <h1 className="text-sm font-semibold text-white">Sistema de Integração</h1>
+          <p className="text-xs text-slate-500">ERP + Olé TV</p>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 overflow-y-auto">
+      {/* Main Navigation */}
+      <nav className="flex-1 p-3 overflow-y-auto">
+        <div className="mb-2">
+          <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Menu Principal
+          </span>
+        </div>
         <div className="space-y-1">
           {navigationItems.map((item) => {
             const Icon = item.icon;
@@ -148,29 +116,21 @@ export default function Sidebar() {
                 to={item.link} 
                 key={item.name}
                 className={`
-                  group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
+                  group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
                   ${active 
-                    ? 'bg-primary/10 text-primary' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    ? 'bg-white text-slate-900' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   }
                 `}
               >
-                <div className={`
-                  p-1.5 rounded-lg transition-colors duration-200
-                  ${active 
-                    ? 'bg-primary/10' 
-                    : 'bg-transparent group-hover:bg-secondary'
-                  }
-                `}>
-                  <Icon className={`w-4 h-4 ${active ? 'text-primary' : ''}`} />
-                </div>
+                <Icon className={`w-4 h-4 ${active ? 'text-slate-900' : 'text-slate-500 group-hover:text-white'}`} />
                 <div className="flex-1 min-w-0">
-                  <span className={`text-sm font-medium ${active ? 'text-primary' : ''}`}>
+                  <span className="text-sm font-medium">
                     {item.name}
                   </span>
                 </div>
                 {active && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
                 )}
               </Link>
             );
@@ -178,48 +138,89 @@ export default function Sidebar() {
         </div>
       </nav>
 
-      {/* User Section */}
-      <div className="p-4 border-t border-border">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-secondary transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-card">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm">
-                <span className="text-sm font-semibold text-primary-foreground">
-                  {getInitials(name)}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-foreground truncate">{name}</p>
-                <p className="text-xs text-muted-foreground truncate">{email}</p>
-              </div>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent 
-            align="end" 
-            className="w-56 bg-popover border border-border shadow-elevated z-50"
-          >
-            <div className="px-3 py-2">
-              <p className="text-sm font-medium text-foreground">{name}</p>
-              <p className="text-xs text-muted-foreground">{email}</p>
-            </div>
-            <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem asChild>
-              <Link to="/conta" className="flex items-center gap-2 cursor-pointer">
-                <User className="w-4 h-4" />
-                <span>Minha Conta</span>
+      {/* Bottom Section */}
+      <div className="p-3 border-t border-slate-800">
+        <div className="mb-2">
+          <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Configurações
+          </span>
+        </div>
+        <div className="space-y-1">
+          {bottomItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.link);
+            
+            return (
+              <Link 
+                to={item.link} 
+                key={item.name}
+                className={`
+                  group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
+                  ${active 
+                    ? 'bg-white text-slate-900' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }
+                `}
+              >
+                <Icon className={`w-4 h-4 ${active ? 'text-slate-900' : 'text-slate-500 group-hover:text-white'}`} />
+                <span className="text-sm font-medium">{item.name}</span>
               </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem 
-              onClick={logout}
-              className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              <span>Sair</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            );
+          })}
+        </div>
+
+        {/* Theme Toggle */}
+        <div className="mt-3 px-3 py-2 bg-slate-800/50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ThemeIcon className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-400">Tema</span>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-7 px-2 text-xs text-slate-300 hover:text-white hover:bg-slate-700"
+                >
+                  {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Sistema'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36 bg-slate-800 border-slate-700">
+                <DropdownMenuItem 
+                  onClick={() => setTheme("light")}
+                  className={`gap-2 cursor-pointer text-slate-300 hover:text-white ${theme === 'light' ? 'bg-slate-700' : ''}`}
+                >
+                  <Sun className="h-4 w-4" />
+                  Claro
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setTheme("dark")}
+                  className={`gap-2 cursor-pointer text-slate-300 hover:text-white ${theme === 'dark' ? 'bg-slate-700' : ''}`}
+                >
+                  <Moon className="h-4 w-4" />
+                  Escuro
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setTheme("system")}
+                  className={`gap-2 cursor-pointer text-slate-300 hover:text-white ${theme === 'system' ? 'bg-slate-700' : ''}`}
+                >
+                  <Monitor className="h-4 w-4" />
+                  Sistema
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Logout */}
+        <button
+          onClick={logout}
+          className="mt-3 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm font-medium">Sair da conta</span>
+        </button>
       </div>
     </aside>
   );
