@@ -29,8 +29,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DeletarUsuario } from "@/components/deletarusuario";
-import { TitlePage } from "@/components/title";
 import useIntegrador from "@/hooks/use-integrador";
 import api from "@/services/api";
 
@@ -48,11 +48,14 @@ import {
   AlertCircle,
   Save,
   X,
-  Loader2
+  Loader2,
+  Info,
+  Mail,
+  User,
+  Shield,
+  HelpCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-
 
 interface User {
   id: string;
@@ -70,7 +73,7 @@ interface EditUserForm {
   password?: string;
 }
 
-// Modal customizado usando React puro
+// Modal customizado com suporte a dark mode
 const CustomModal = ({ 
   isOpen, 
   onClose, 
@@ -114,36 +117,36 @@ const CustomModal = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
       onClick={handleBackdropClick}
     >
       <div 
         ref={modalRef}
-        className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-card border border-border rounded-2xl shadow-elevated max-w-md w-full max-h-[90vh] overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary/10 rounded-xl">
+              <Pencil className="h-5 w-5 text-primary" />
+            </div>
             <div>
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Pencil className="h-4 w-4 text-blue-600" />
-                </div>
-                {title}
-              </h2>
+              <h2 className="text-lg font-semibold text-foreground">{title}</h2>
               {description && (
-                <p className="text-sm text-gray-600 mt-2">{description}</p>
+                <p className="text-sm text-muted-foreground">{description}</p>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="rounded-lg"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
           {children}
         </div>
       </div>
@@ -175,7 +178,6 @@ const EditUserModal = ({
   const { toast } = useToast();
   const integrador = useIntegrador();
 
-  // Preenche o formulário quando o usuário é selecionado
   useEffect(() => {
     if (user && isOpen) {
       setFormData({
@@ -195,7 +197,6 @@ const EditUserModal = ({
       [field]: value
     }));
     
-    // Limpa o erro do campo quando o usuário digita
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -279,7 +280,6 @@ const EditUserModal = ({
   const handleClose = () => {
     if (isLoading) return;
     
-    // Reset do formulário
     setFormData({
       name: '',
       email: '',
@@ -299,11 +299,14 @@ const EditUserModal = ({
       isOpen={isOpen}
       onClose={handleClose}
       title="Editar Usuário"
-      description="Altere as informações do usuário. Deixe a senha em branco para mantê-la inalterada."
+      description="Altere as informações do usuário"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Nome completo *</Label>
+          <Label htmlFor="name" className="flex items-center gap-2">
+            <User className="h-3.5 w-3.5 text-muted-foreground" />
+            Nome completo *
+          </Label>
           <Input
             id="name"
             value={formData.name}
@@ -311,11 +314,14 @@ const EditUserModal = ({
             placeholder="Digite o nome completo"
             disabled={isLoading}
           />
-          {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+          {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email *</Label>
+          <Label htmlFor="email" className="flex items-center gap-2">
+            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+            Email *
+          </Label>
           <Input
             id="email"
             type="email"
@@ -324,23 +330,39 @@ const EditUserModal = ({
             placeholder="Digite o email"
             disabled={isLoading}
           />
-          {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
+          {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="username">Nome de usuário *</Label>
+          <Label htmlFor="username" className="flex items-center gap-2">
+            <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+            Nome de usuário *
+          </Label>
           <Input
             id="username"
             value={formData.username}
             onChange={(e) => handleInputChange('username', e.target.value)}
             placeholder="Digite o nome de usuário"
             disabled={isLoading}
+            className="font-mono"
           />
-          {errors.username && <p className="text-sm text-red-500">{errors.username}</p>}
+          {errors.username && <p className="text-sm text-destructive">{errors.username}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Nova senha</Label>
+          <Label htmlFor="password" className="flex items-center gap-2">
+            Nova senha
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Deixe em branco para manter a senha atual</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Label>
           <Input
             id="password"
             type="password"
@@ -349,7 +371,7 @@ const EditUserModal = ({
             placeholder="Deixe em branco para manter atual"
             disabled={isLoading}
           />
-          {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+          {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
         </div>
 
         <div className="space-y-2">
@@ -365,13 +387,13 @@ const EditUserModal = ({
             <SelectContent>
               <SelectItem value="1">
                 <div className="flex items-center gap-2">
-                  <UserCheck className="h-4 w-4 text-green-600" />
+                  <UserCheck className="h-4 w-4 text-success" />
                   Ativo
                 </div>
               </SelectItem>
               <SelectItem value="0">
                 <div className="flex items-center gap-2">
-                  <UserX className="h-4 w-4 text-red-600" />
+                  <UserX className="h-4 w-4 text-destructive" />
                   Inativo
                 </div>
               </SelectItem>
@@ -386,7 +408,6 @@ const EditUserModal = ({
             onClick={handleClose}
             disabled={isLoading}
           >
-            <X className="h-4 w-4 mr-2" />
             Cancelar
           </Button>
           <Button 
@@ -397,7 +418,7 @@ const EditUserModal = ({
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Salvando...
+                Salvando
               </>
             ) : (
               <>
@@ -420,7 +441,6 @@ export function Usuarios() {
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
   
-  // Estados para o modal de edição
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
@@ -450,7 +470,6 @@ export function Usuarios() {
     }
   };
 
-  // Funções para o modal de edição
   const openEditModal = (user: User) => {
     setSelectedUser(user);
     setIsEditModalOpen(true);
@@ -462,14 +481,12 @@ export function Usuarios() {
   };
 
   const handleUserUpdated = () => {
-    listarUsuarios(); // Recarrega a lista após a edição
+    listarUsuarios();
   };
 
-  // Filtros e busca
   useEffect(() => {
     let filtered = data;
 
-    // Filtro por busca
     if (searchTerm.trim()) {
       filtered = filtered.filter(user => 
         user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -478,7 +495,6 @@ export function Usuarios() {
       );
     }
 
-    // Filtro por status
     if (activeFilter !== "all") {
       filtered = filtered.filter(user => 
         activeFilter === "active" ? user.isActive === 1 : user.isActive !== 1
@@ -499,231 +515,400 @@ export function Usuarios() {
     listarUsuarios();
   };
 
-
-
   return (
-    <div className="space-y-6">
-      <TitlePage title="Usuários" />
-
-      
-
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Usuários cadastrados no sistema
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              {data.length > 0 ? `${Math.round((activeUsers / data.length) * 100)}%` : "0%"} do total
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuários Inativos</CardTitle>
-            <UserX className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{inactiveUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              {data.length > 0 ? `${Math.round((inactiveUsers / data.length) * 100)}%` : "0%"} do total
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Controles e Filtros */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Gerenciar Usuários</CardTitle>
-              <CardDescription>
-                Visualize e gerencie todos os usuários do sistema
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleRefresh}
-                disabled={isLoading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Atualizar
-              </Button>
-              <CriarUsuarios listarUsuarios={listarUsuarios} />
-            </div>
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Header da Página */}
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl">
+            <Users className="h-6 w-6 text-primary" />
           </div>
-
-          {/* Barra de Busca e Filtros */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, email ou usuário..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Button
-                variant={activeFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveFilter("all")}
-              >
-                Todos ({data.length})
-              </Button>
-              <Button
-                variant={activeFilter === "active" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveFilter("active")}
-              >
-                Ativos ({activeUsers})
-              </Button>
-              <Button
-                variant={activeFilter === "inactive" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveFilter("inactive")}
-              >
-                Inativos ({inactiveUsers})
-              </Button>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Usuários</h1>
+            <p className="text-sm text-muted-foreground">
+              Gerencie os usuários com acesso ao sistema
+            </p>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent>
-          {/* Estado de Loading */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
-              <span className="text-muted-foreground">Carregando usuários...</span>
-            </div>
-          ) : error ? (
-            /* Estado de Erro */
-            <div className="flex items-center justify-center py-8 text-red-600">
-              <AlertCircle className="h-6 w-6 mr-2" />
-              <span>{error}</span>
-            </div>
-          ) : filteredData.length === 0 ? (
-            /* Estado Vazio */
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <Users className="h-12 w-12 mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">
-                {searchTerm || activeFilter !== "all" ? "Nenhum usuário encontrado" : "Nenhum usuário cadastrado"}
+        {/* Cards de Estatísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-border shadow-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-primary/5 to-transparent">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Todos os usuários cadastrados que podem acessar o sistema</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Users className="h-4 w-4 text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="text-3xl font-bold text-foreground">{data.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Usuários com credenciais de acesso
               </p>
-              <p className="text-sm">
-                {searchTerm || activeFilter !== "all" 
-                  ? "Tente ajustar os filtros de busca" 
-                  : "Clique em 'Criar Usuário' para adicionar o primeiro usuário"
-                }
-              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-success/20 shadow-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-success/10 to-transparent">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Usuários que podem fazer login e utilizar o sistema</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="p-2 bg-success/10 rounded-lg">
+                <UserCheck className="h-4 w-4 text-success" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="text-3xl font-bold text-success">{activeUsers}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-success rounded-full transition-all"
+                    style={{ width: `${data.length > 0 ? (activeUsers / data.length) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {data.length > 0 ? `${Math.round((activeUsers / data.length) * 100)}%` : "0%"}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-destructive/20 shadow-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-destructive/10 to-transparent">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-medium">Usuários Inativos</CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Usuários desativados que não podem acessar o sistema</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="p-2 bg-destructive/10 rounded-lg">
+                <UserX className="h-4 w-4 text-destructive" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="text-3xl font-bold text-destructive">{inactiveUsers}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-destructive rounded-full transition-all"
+                    style={{ width: `${data.length > 0 ? (inactiveUsers / data.length) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {data.length > 0 ? `${Math.round((inactiveUsers / data.length) * 100)}%` : "0%"}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Controles e Filtros */}
+        <Card className="border-border shadow-card">
+          <CardHeader className="border-b border-border bg-gradient-to-r from-muted/50 to-transparent">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg">Gerenciar Usuários</CardTitle>
+                <CardDescription>
+                  Visualize, edite e gerencie as permissões de acesso
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleRefresh}
+                      disabled={isLoading}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                      Atualizar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Recarregar lista de usuários</p>
+                  </TooltipContent>
+                </Tooltip>
+                <CriarUsuarios listarUsuarios={listarUsuarios} />
+              </div>
             </div>
-          ) : (
-            /* Tabela de Usuários */
-            <div className="rounded-md border">
-              <Table>
-                <TableCaption>
-                  Mostrando {filteredData.length} de {data.length} usuários
-                </TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData.map((user) => (
-                    <TableRow key={user.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                      <TableCell>
-                        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
-                          {user.username}
-                        </code>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge 
-                          variant={user.isActive === 1 ? "default" : "secondary"}
-                          className={user.isActive === 1 ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}
-                        >
-                          {user.isActive === 1 ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="h-8 w-8 p-0 hover:bg-muted"
-                            >
-                              <EllipsisVertical className="h-4 w-4" />
-                              <span className="sr-only">Abrir menu de ações</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-56" align="end">
-                            <DropdownMenuLabel>Ações do usuário</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem onClick={() => openEditModal(user)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Editar usuário
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                onSelect={(e) => e.preventDefault()}
-                                className="text-red-600 focus:text-red-600"
-                              >
-                                <Trash className="mr-2 h-4 w-4" />
-                                <DeletarUsuario 
-                                  idUser={user.id} 
-                                  listarUsuarios={listarUsuarios}
-                                />
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+
+            {/* Barra de Busca e Filtros */}
+            <div className="flex flex-col sm:flex-row gap-4 mt-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, email ou usuário..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={activeFilter === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setActiveFilter("all")}
+                    >
+                      Todos ({data.length})
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Mostrar todos os usuários</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={activeFilter === "active" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setActiveFilter("active")}
+                      className={activeFilter === "active" ? "bg-success hover:bg-success/90" : ""}
+                    >
+                      Ativos ({activeUsers})
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtrar apenas usuários ativos</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={activeFilter === "inactive" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setActiveFilter("inactive")}
+                      className={activeFilter === "inactive" ? "bg-destructive hover:bg-destructive/90" : ""}
+                    >
+                      Inativos ({inactiveUsers})
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtrar apenas usuários inativos</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-6">
+            {/* Estado de Loading */}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="p-4 bg-primary/10 rounded-full mb-4">
+                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                </div>
+                <span className="text-muted-foreground">Carregando usuários...</span>
+              </div>
+            ) : error ? (
+              /* Estado de Erro */
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="p-4 bg-destructive/10 rounded-full mb-4">
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                </div>
+                <span className="text-destructive font-medium mb-2">{error}</span>
+                <Button variant="outline" size="sm" onClick={handleRefresh}>
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : filteredData.length === 0 ? (
+              /* Estado Vazio */
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <div className="p-4 bg-muted rounded-full mb-4">
+                  <Users className="h-8 w-8 opacity-50" />
+                </div>
+                <p className="text-lg font-medium mb-2">
+                  {searchTerm || activeFilter !== "all" ? "Nenhum usuário encontrado" : "Nenhum usuário cadastrado"}
+                </p>
+                <p className="text-sm text-center max-w-md">
+                  {searchTerm || activeFilter !== "all" 
+                    ? "Tente ajustar os filtros de busca ou limpar os critérios" 
+                    : "Clique em 'Criar novo usuário' para adicionar o primeiro usuário ao sistema"
+                  }
+                </p>
+              </div>
+            ) : (
+              /* Tabela de Usuários */
+              <div className="rounded-xl border border-border overflow-hidden">
+                <Table>
+                  <TableCaption className="py-4">
+                    Mostrando {filteredData.length} de {data.length} usuários
+                  </TableCaption>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Nome
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          Email
+                        </div>
+                      </TableHead>
+                      <TableHead className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Usuário
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center font-semibold">Status</TableHead>
+                      <TableHead className="text-right font-semibold">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredData.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-sm font-semibold text-primary">
+                                {user.name?.charAt(0)?.toUpperCase() || "?"}
+                              </span>
+                            </div>
+                            <span className="font-medium text-foreground">{user.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <a 
+                            href={`mailto:${user.email}`}
+                            className="text-primary hover:text-primary/80 hover:underline transition-colors"
+                          >
+                            {user.email}
+                          </a>
+                        </TableCell>
+                        <TableCell>
+                          <code className="relative rounded-md bg-muted px-2 py-1 font-mono text-sm">
+                            {user.username}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge 
+                                variant="outline"
+                                className={user.isActive === 1 
+                                  ? "bg-success/10 text-success border-success/20 cursor-help" 
+                                  : "bg-destructive/10 text-destructive border-destructive/20 cursor-help"
+                                }
+                              >
+                                {user.isActive === 1 ? (
+                                  <>
+                                    <UserCheck className="h-3 w-3 mr-1" />
+                                    Ativo
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserX className="h-3 w-3 mr-1" />
+                                    Inativo
+                                  </>
+                                )}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                {user.isActive === 1 
+                                  ? "Este usuário pode acessar o sistema" 
+                                  : "Este usuário está desativado"
+                                }
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-muted"
+                                  >
+                                    <EllipsisVertical className="h-4 w-4" />
+                                    <span className="sr-only">Abrir menu de ações</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Ações do usuário</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            <DropdownMenuContent className="w-56 bg-popover border border-border" align="end">
+                              <DropdownMenuLabel className="flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Ações do usuário
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuGroup>
+                                <DropdownMenuItem 
+                                  onClick={() => openEditModal(user)}
+                                  className="cursor-pointer"
+                                >
+                                  <Pencil className="mr-2 h-4 w-4 text-primary" />
+                                  Editar usuário
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onSelect={(e) => e.preventDefault()}
+                                  className="text-destructive focus:text-destructive cursor-pointer"
+                                >
+                                  <Trash className="mr-2 h-4 w-4" />
+                                  <DeletarUsuario 
+                                    idUser={user.id} 
+                                    listarUsuarios={listarUsuarios}
+                                  />
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Modal de Edição */}
-      <EditUserModal
-        user={selectedUser}
-        isOpen={isEditModalOpen}
-        onClose={closeEditModal}
-        onUserUpdated={handleUserUpdated}
-      />
-    </div>
+        {/* Modal de Edição */}
+        <EditUserModal
+          user={selectedUser}
+          isOpen={isEditModalOpen}
+          onClose={closeEditModal}
+          onUserUpdated={handleUserUpdated}
+        />
+      </div>
+    </TooltipProvider>
   );
 }

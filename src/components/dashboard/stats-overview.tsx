@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Users, UserCheck, UserX, TrendingUp } from "lucide-react"
+import { Users, UserCheck, UserX, XCircle } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
 import useIntegrador from "@/hooks/use-integrador"
 import { TotalClienteDash } from "@/services/totalclientes"
@@ -58,6 +58,7 @@ export function StatsOverview() {
       <StatCard
         title="Total de Clientes"
         description="Cadastrados na base"
+        tooltip="Soma de todos os clientes registrados no sistema, independente do status do contrato"
         value={stats.total}
         icon={<Users className="h-6 w-6" />}
         variant="primary"
@@ -68,6 +69,7 @@ export function StatsOverview() {
       <StatCard
         title="Clientes Ativos"
         description="Possuem contrato ativo"
+        tooltip="Clientes que possuem um contrato ativo na integração e podem acessar os serviços"
         value={stats.ativos}
         icon={<UserCheck className="h-6 w-6" />}
         variant="success"
@@ -78,6 +80,7 @@ export function StatsOverview() {
       <StatCard
         title="Clientes Inativos"
         description="Sem contrato na integração"
+        tooltip="Clientes cadastrados na base mas que não possuem um contrato ativo vinculado"
         value={stats.inativos}
         icon={<UserX className="h-6 w-6" />}
         variant="warning"
@@ -88,8 +91,9 @@ export function StatsOverview() {
       <StatCard
         title="Cancelados"
         description="Contratos cancelados"
+        tooltip="Clientes que tiveram seus contratos cancelados e não utilizam mais os serviços"
         value={stats.cancelados}
-        icon={<TrendingUp className="h-6 w-6" />}
+        icon={<XCircle className="h-6 w-6" />}
         variant="destructive"
         isLoading={isLoading}
         trend={{ value: -5, label: "este mês" }}

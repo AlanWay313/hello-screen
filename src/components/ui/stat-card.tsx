@@ -1,11 +1,13 @@
 import * as React from "react"
-import { TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface StatCardProps {
   title: string
   value: string | number
   description?: string
+  tooltip?: string
   icon?: React.ReactNode
   trend?: {
     value: number
@@ -48,6 +50,7 @@ export function StatCard({
   title,
   value,
   description,
+  tooltip,
   icon,
   trend,
   variant = 'default',
@@ -93,7 +96,21 @@ export function StatCard({
               </div>
             )}
             <div>
-              <h3 className="font-semibold text-foreground">{title}</h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className="font-semibold text-foreground">{title}</h3>
+                {tooltip && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
               {description && (
                 <p className="text-sm text-muted-foreground">{description}</p>
               )}
