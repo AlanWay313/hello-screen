@@ -3,7 +3,6 @@ import { useState, useCallback, DragEvent } from 'react';
 import { StatsOverview } from './stats-overview';
 import { ClientsChart } from './charts/clients-chart';
 import { StatusPieChart } from './charts/status-pie-chart';
-import { WeeklyBarChart } from './charts/bar-chart';
 import { Button } from '@/components/ui/button';
 import { DashboardFiltersBar } from './dashboard-filters-bar';
 import { DashboardFilters, defaultFilters } from './dashboard-filters-context';
@@ -189,12 +188,6 @@ export function Dashboard() {
           );
         case 'status-pie':
           return <StatusPieChart key={`pie-${refreshKey}`} filters={filters} />;
-        case 'weekly-bar':
-          return (
-            <div className={viewMode === 'grid' ? 'xl:col-span-2' : ''}>
-              <WeeklyBarChart key={`bar-${refreshKey}`} filters={filters} />
-            </div>
-          );
         default:
           return null;
       }

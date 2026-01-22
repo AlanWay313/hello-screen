@@ -11,7 +11,6 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: "stats", title: "Estatísticas", visible: true, order: 0 },
   { id: "clients-chart", title: "Evolução de Clientes", visible: true, order: 1 },
   { id: "status-pie", title: "Distribuição de Status", visible: true, order: 2 },
-  { id: "weekly-bar", title: "Atividade Semanal", visible: true, order: 3 },
 ];
 
 const STORAGE_KEY = "dashboard-layout";
