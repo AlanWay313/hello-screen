@@ -189,6 +189,12 @@ export function ChangelogModal({
     return acc;
   }, {} as Record<string, { date: string; items: ChangelogItem[] }>);
 
+  // Salvar como visto quando fechar de qualquer forma
+  const handleClose = () => {
+    localStorage.setItem(STORAGE_KEY, CURRENT_VERSION);
+    onClose();
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -196,7 +202,7 @@ export function ChangelogModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
-        onClick={(e) => e.target === e.currentTarget && onClose()}
+        onClick={(e) => e.target === e.currentTarget && handleClose()}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -232,7 +238,7 @@ export function ChangelogModal({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onClose}
+                onClick={handleClose}
                 className="rounded-lg"
               >
                 <X className="h-5 w-5" />
@@ -314,7 +320,7 @@ export function ChangelogModal({
                 <Rocket className="h-4 w-4 text-primary" />
                 Estamos sempre melhorando!
               </p>
-              <Button onClick={onClose} className="gap-2">
+              <Button onClick={handleClose} className="gap-2">
                 Entendi, vamos lá!
                 <ArrowRight className="h-4 w-4" />
               </Button>
