@@ -1,4 +1,4 @@
-import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw } from 'lucide-react';
+import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw, Download } from 'lucide-react';
 import { useState } from 'react';
 import { StatsOverview } from './stats-overview';
 import { ClientsChart } from './charts/clients-chart';
@@ -7,17 +7,41 @@ import { WeeklyBarChart } from './charts/bar-chart';
 import { Button } from '@/components/ui/button';
 import { DashboardFiltersBar } from './dashboard-filters-bar';
 import { DashboardFilters, defaultFilters } from './dashboard-filters-context';
+import { ClientesCanceladosApi } from '@/services/clientesCancelados';
+import useIntegrador from '@/hooks/use-integrador';
+import { exportToCSV, clienteExportColumns } from '@/lib/export-utils';
 
 export function Dashboard() {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'wide'>('grid');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
+  const integrador = useIntegrador();
 
   const handleRefresh = () => {
     setIsRefreshing(true);
     // Simulate refresh
     setTimeout(() => setIsRefreshing(false), 1000);
+  };
+
+  const handleExport = async () => {
+    if (!integrador) return;
+    
+    setIsExporting(true);
+    try {
+      const clientes = await ClientesCanceladosApi(integrador);
+      if (clientes && clientes.length > 0) {
+        exportToCSV(clientes, 'dashboard_clientes', clienteExportColumns);
+      } else {
+        alert('Não há dados para exportar.');
+      }
+    } catch (error) {
+      console.error('Erro ao exportar dados:', error);
+      alert('Erro ao exportar dados.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const ViewModeButton = ({ 
@@ -61,6 +85,17 @@ export function Dashboard() {
 
           {/* Controls */}
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={isExporting}
+              className="gap-2"
+            >
+              <Download className={`h-4 w-4 ${isExporting ? 'animate-pulse' : ''}`} />
+              Exportar CSV
+            </Button>
+            
             <Button
               variant="outline"
               size="sm"
