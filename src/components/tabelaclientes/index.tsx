@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Mail, Phone, MapPin, FileText } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Mail, Phone, MapPin, FileText, UserCheck, UserX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { DataTable } from "@/components/ui/data-table"
+import { DataTable, FilterOption } from "@/components/ui/data-table"
 import useIntegrador from "@/hooks/use-integrador"
 import ResetSenha from "../resetsenha"
 import EditarCliente from "../editarcliente"
@@ -26,6 +26,10 @@ interface Cliente {
   contato: string
   endereco_logradouro: string
   endereco_cep: string
+  status?: string
+  estado?: string
+  cidade?: string
+  data_cadastro?: string
 }
 
 const ActionsCell = React.memo(
@@ -42,7 +46,7 @@ const ActionsCell = React.memo(
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-48 bg-popover border border-border z-50">
           <DropdownMenuLabel>Ações</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <ResetSenha contratoCliente={contrato} emailCliente={email} />
@@ -76,7 +80,14 @@ const getColumns = (_refetch: () => void): ColumnDef<Cliente>[] => [
             {(row.getValue("nome") as string)?.charAt(0)?.toUpperCase() || "?"}
           </span>
         </div>
-        <span className="font-medium text-foreground">{row.getValue("nome")}</span>
+        <div className="flex flex-col">
+          <span className="font-medium text-foreground">{row.getValue("nome")}</span>
+          {row.original.status && (
+            <span className={`text-xs ${row.original.status === 'ativo' ? 'text-success' : 'text-muted-foreground'}`}>
+              {row.original.status === 'ativo' ? '● Ativo' : '○ Inativo'}
+            </span>
+          )}
+        </div>
       </div>
     ),
   },
@@ -164,6 +175,25 @@ const getColumns = (_refetch: () => void): ColumnDef<Cliente>[] => [
     ),
   },
   {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => {
+      const status = row.getValue("status") as string
+      return (
+        <Badge 
+          variant={status === 'ativo' ? 'default' : 'secondary'}
+          className={status === 'ativo' ? 'bg-success/10 text-success border-success/20' : ''}
+        >
+          {status === 'ativo' ? (
+            <><UserCheck className="h-3 w-3 mr-1" /> Ativo</>
+          ) : (
+            <><UserX className="h-3 w-3 mr-1" /> Inativo</>
+          )}
+        </Badge>
+      )
+    },
+  },
+  {
     id: "actions",
     header: () => <div className="text-center font-semibold">Ações</div>,
     cell: ({ row }) => (
@@ -171,6 +201,43 @@ const getColumns = (_refetch: () => void): ColumnDef<Cliente>[] => [
         <ActionsCell row={row} refetch={() => {}} />
       </div>
     ),
+  },
+]
+
+// Define available filters
+const clienteFilters: FilterOption[] = [
+  {
+    id: "status",
+    label: "Status",
+    options: [
+      { value: "ativo", label: "Ativos" },
+      { value: "inativo", label: "Inativos" },
+    ],
+  },
+  {
+    id: "estado",
+    label: "Estado",
+    options: [
+      { value: "SP", label: "São Paulo" },
+      { value: "RJ", label: "Rio de Janeiro" },
+      { value: "MG", label: "Minas Gerais" },
+      { value: "RS", label: "Rio Grande do Sul" },
+      { value: "PR", label: "Paraná" },
+      { value: "SC", label: "Santa Catarina" },
+      { value: "BA", label: "Bahia" },
+      { value: "GO", label: "Goiás" },
+      { value: "DF", label: "Distrito Federal" },
+      { value: "PE", label: "Pernambuco" },
+      { value: "CE", label: "Ceará" },
+    ],
+  },
+  {
+    id: "tipo_documento",
+    label: "Tipo de Documento",
+    options: [
+      { value: "cpf", label: "CPF (Pessoa Física)" },
+      { value: "cnpj", label: "CNPJ (Pessoa Jurídica)" },
+    ],
   },
 ]
 
@@ -190,7 +257,14 @@ export function TabelaDeClientes() {
         { params: { idIntegra: integrador } }
       )
 
-      setData(result.data.data || [])
+      // Add status field based on existing data
+      const clientesWithStatus = (result.data.data || []).map((cliente: any) => ({
+        ...cliente,
+        status: cliente.email ? 'ativo' : 'inativo',
+        tipo_documento: cliente.cpf_cnpj?.length > 14 ? 'cnpj' : 'cpf',
+      }))
+
+      setData(clientesWithStatus)
     } catch (err) {
       console.error("Erro ao buscar clientes:", err)
       setError("Erro ao carregar clientes. Tente novamente.")
@@ -206,6 +280,10 @@ export function TabelaDeClientes() {
   }, [fetchClientes, integrador])
 
   const columns = React.useMemo(() => getColumns(fetchClientes), [fetchClientes])
+
+  const handleFilterChange = React.useCallback((filters: Record<string, string>) => {
+    console.log("Filtros aplicados:", filters)
+  }, [])
 
   if (loading) {
     return <Loading />
@@ -231,6 +309,8 @@ export function TabelaDeClientes() {
       onRefresh={fetchClientes}
       isLoading={loading}
       emptyMessage="Nenhum cliente encontrado."
+      filters={clienteFilters}
+      onFilterChange={handleFilterChange}
     />
   )
 }

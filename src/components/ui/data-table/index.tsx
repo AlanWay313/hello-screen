@@ -19,7 +19,9 @@ import {
   ChevronsRight, 
   Search, 
   SlidersHorizontal,
-  RefreshCw
+  RefreshCw,
+  Filter,
+  X
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,6 +48,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+
+export interface FilterOption {
+  id: string
+  label: string
+  options: { value: string; label: string }[]
+}
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -55,6 +70,8 @@ interface DataTableProps<TData, TValue> {
   onRefresh?: () => void
   isLoading?: boolean
   emptyMessage?: string
+  filters?: FilterOption[]
+  onFilterChange?: (filters: Record<string, string>) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -65,12 +82,33 @@ export function DataTable<TData, TValue>({
   onRefresh,
   isLoading = false,
   emptyMessage = "Nenhum resultado encontrado.",
+  filters = [],
+  onFilterChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
+  const [activeFilters, setActiveFilters] = React.useState<Record<string, string>>({})
+  const [isFilterOpen, setIsFilterOpen] = React.useState(false)
+
+  const activeFilterCount = Object.values(activeFilters).filter(v => v && v !== 'all').length
+
+  const handleFilterChange = (filterId: string, value: string) => {
+    const newFilters = { ...activeFilters, [filterId]: value }
+    if (value === 'all' || !value) {
+      delete newFilters[filterId]
+    }
+    setActiveFilters(newFilters)
+    onFilterChange?.(newFilters)
+  }
+
+  const clearAllFilters = () => {
+    setActiveFilters({})
+    setGlobalFilter("")
+    onFilterChange?.({})
+  }
 
   const globalFilterFn = React.useCallback(
     (row: Row<TData>, _columnId: string, filterValue: string): boolean => {
@@ -86,7 +124,6 @@ export function DataTable<TData, TValue>({
         })
       }
 
-      // Search all columns if no specific columns defined
       return columns.some(col => {
         const columnId = (col as any).accessorKey || (col as any).id
         if (!columnId) return false
@@ -98,8 +135,22 @@ export function DataTable<TData, TValue>({
     [columns, searchableColumns]
   )
 
+  // Apply custom filters to data
+  const filteredData = React.useMemo(() => {
+    if (Object.keys(activeFilters).length === 0) return data
+
+    return data.filter((row: any) => {
+      return Object.entries(activeFilters).every(([key, value]) => {
+        if (!value || value === 'all') return true
+        const rowValue = row[key]
+        if (rowValue == null) return false
+        return String(rowValue).toLowerCase().includes(value.toLowerCase())
+      })
+    })
+  }, [data, activeFilters])
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -127,7 +178,7 @@ export function DataTable<TData, TValue>({
 
   React.useEffect(() => {
     table.setPageIndex(0)
-  }, [globalFilter, table])
+  }, [globalFilter, table, activeFilters])
 
   const pageCount = table.getPageCount()
   const currentPage = table.getState().pagination.pageIndex + 1
@@ -138,58 +189,204 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={searchPlaceholder}
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-10 bg-card border-border focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
+      {/* Advanced Filters Bar */}
+      <div className="p-4 bg-card rounded-xl border border-border shadow-card space-y-4">
+        {/* Main Search Row */}
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          <div className="relative w-full lg:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-10 bg-background border-border focus:ring-2 focus:ring-primary/20"
+            />
+            {globalFilter && (
+              <button
+                onClick={() => setGlobalFilter("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2">
-          {onRefresh && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              Atualizar
-            </Button>
-          )}
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <SlidersHorizontal className="h-4 w-4" />
-                Colunas
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Colunas Visíveis</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Button */}
+            {filters.length > 0 && (
+              <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2 relative"
                   >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                    {activeFilterCount > 0 && (
+                      <Badge 
+                        variant="default" 
+                        className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                      >
+                        {activeFilterCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-4 bg-popover border border-border z-50" align="end">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-foreground">Filtros Avançados</h4>
+                      {activeFilterCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearAllFilters}
+                          className="h-auto p-1 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Limpar todos
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="space-y-3">
+                      {filters.map((filter) => (
+                        <div key={filter.id} className="space-y-1.5">
+                          <label className="text-sm font-medium text-foreground">
+                            {filter.label}
+                          </label>
+                          <Select
+                            value={activeFilters[filter.id] || "all"}
+                            onValueChange={(value) => handleFilterChange(filter.id, value)}
+                          >
+                            <SelectTrigger className="w-full bg-background">
+                              <SelectValue placeholder={`Selecionar ${filter.label.toLowerCase()}`} />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border border-border z-50">
+                              <SelectItem value="all">Todos</SelectItem>
+                              {filter.options.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          clearAllFilters()
+                          setIsFilterOpen(false)
+                        }}
+                      >
+                        Limpar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setIsFilterOpen(false)}
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {onRefresh && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Colunas
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-popover border border-border z-50">
+                <DropdownMenuLabel>Colunas Visíveis</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
+
+        {/* Active Filters Display */}
+        {(activeFilterCount > 0 || globalFilter) && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
+            <span className="text-xs text-muted-foreground">Filtros ativos:</span>
+            
+            {globalFilter && (
+              <Badge 
+                variant="secondary" 
+                className="gap-1 pr-1 cursor-pointer hover:bg-secondary/80"
+                onClick={() => setGlobalFilter("")}
+              >
+                Busca: "{globalFilter}"
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            
+            {Object.entries(activeFilters).map(([key, value]) => {
+              const filter = filters.find(f => f.id === key)
+              const option = filter?.options.find(o => o.value === value)
+              return (
+                <Badge 
+                  key={key}
+                  variant="secondary" 
+                  className="gap-1 pr-1 cursor-pointer hover:bg-secondary/80"
+                  onClick={() => handleFilterChange(key, 'all')}
+                >
+                  {filter?.label}: {option?.label || value}
+                  <X className="h-3 w-3" />
+                </Badge>
+              )
+            })}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Limpar todos
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -245,13 +442,13 @@ export function DataTable<TData, TValue>({
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <Search className="h-8 w-8 opacity-50" />
                     <p>{emptyMessage}</p>
-                    {globalFilter && (
+                    {(globalFilter || activeFilterCount > 0) && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setGlobalFilter("")}
+                        onClick={clearAllFilters}
                       >
-                        Limpar filtro
+                        Limpar filtros
                       </Button>
                     )}
                   </div>
@@ -277,10 +474,10 @@ export function DataTable<TData, TValue>({
               value={String(pageSize)}
               onValueChange={(value) => table.setPageSize(Number(value))}
             >
-              <SelectTrigger className="h-8 w-[70px]">
+              <SelectTrigger className="h-8 w-[70px] bg-background">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover border border-border z-50">
                 {[5, 10, 20, 30, 50].map((size) => (
                   <SelectItem key={size} value={String(size)}>
                     {size}
