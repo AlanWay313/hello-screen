@@ -1,4 +1,4 @@
-import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw, Download } from 'lucide-react';
+import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw, Download, ChevronDown, Users, UserCheck, UserX, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { StatsOverview } from './stats-overview';
 import { ClientsChart } from './charts/clients-chart';
@@ -10,6 +10,15 @@ import { DashboardFilters, defaultFilters } from './dashboard-filters-context';
 import { ClientesCanceladosApi } from '@/services/clientesCancelados';
 import useIntegrador from '@/hooks/use-integrador';
 import { exportToCSV, clienteExportColumns } from '@/lib/export-utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+
+type ExportType = 'todos' | 'ativos' | 'inativos' | 'cancelados';
 
 export function Dashboard() {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'wide'>('grid');
@@ -21,20 +30,44 @@ export function Dashboard() {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    // Simulate refresh
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  const handleExport = async () => {
+  const handleExport = async (type: ExportType) => {
     if (!integrador) return;
     
     setIsExporting(true);
     try {
       const clientes = await ClientesCanceladosApi(integrador);
-      if (clientes && clientes.length > 0) {
-        exportToCSV(clientes, 'dashboard_clientes', clienteExportColumns);
-      } else {
+      if (!clientes || clientes.length === 0) {
         alert('Não há dados para exportar.');
+        return;
+      }
+
+      let filteredClientes = clientes;
+      let filename = 'clientes';
+
+      switch (type) {
+        case 'ativos':
+          filteredClientes = clientes.filter((c: any) => c.ole_contract_number);
+          filename = 'clientes_ativos';
+          break;
+        case 'inativos':
+          filteredClientes = clientes.filter((c: any) => !c.ole_contract_number);
+          filename = 'clientes_inativos';
+          break;
+        case 'cancelados':
+          filteredClientes = clientes.filter((c: any) => c.voalle_contract_status === 'cancelado');
+          filename = 'clientes_cancelados';
+          break;
+        default:
+          filename = 'clientes_todos';
+      }
+
+      if (filteredClientes.length > 0) {
+        exportToCSV(filteredClientes, filename, clienteExportColumns);
+      } else {
+        alert('Não há dados para exportar com o filtro selecionado.');
       }
     } catch (error) {
       console.error('Erro ao exportar dados:', error);
@@ -85,16 +118,39 @@ export function Dashboard() {
 
           {/* Controls */}
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              disabled={isExporting}
-              className="gap-2"
-            >
-              <Download className={`h-4 w-4 ${isExporting ? 'animate-pulse' : ''}`} />
-              Exportar CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isExporting}
+                  className="gap-2"
+                >
+                  <Download className={`h-4 w-4 ${isExporting ? 'animate-pulse' : ''}`} />
+                  Exportar CSV
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-popover z-50">
+                <DropdownMenuItem onClick={() => handleExport('todos')} className="gap-2 cursor-pointer">
+                  <Users className="h-4 w-4" />
+                  Todos os Clientes
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleExport('ativos')} className="gap-2 cursor-pointer">
+                  <UserCheck className="h-4 w-4 text-success" />
+                  Apenas Ativos
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('inativos')} className="gap-2 cursor-pointer">
+                  <UserX className="h-4 w-4 text-warning" />
+                  Apenas Inativos
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('cancelados')} className="gap-2 cursor-pointer">
+                  <XCircle className="h-4 w-4 text-destructive" />
+                  Apenas Cancelados
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             <Button
               variant="outline"
