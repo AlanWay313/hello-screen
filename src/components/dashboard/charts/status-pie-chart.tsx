@@ -2,8 +2,8 @@ import { useEffect, useState } from "react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import useIntegrador from "@/hooks/use-integrador"
-import { TotalClienteDash } from "@/services/totalclientes"
-import { ClientesCanceladosApi } from "@/services/clientesCancelados"
+import { ListarTodosClientes } from "@/services/listarTodosClientes"
+import { filterByPeriodo } from "@/lib/date-filter-utils"
 
 const COLORS = [
   'hsl(var(--success))',
@@ -29,14 +29,32 @@ export function StatusPieChart({ filters }: StatusPieChartProps) {
       
       setIsLoading(true)
       try {
-        const [clientesData, canceladosData] = await Promise.all([
-          TotalClienteDash(integrador),
-          ClientesCanceladosApi(integrador),
-        ])
+        const todosClientes = await ListarTodosClientes(integrador)
 
-        let ativos = Number(clientesData?.nao_nulos || 0)
-        let inativos = Number(clientesData?.nulos || 0)
-        let cancelados = canceladosData?.length || 0
+        // Aplicar filtro de período usando created_at
+        const clientesFiltrados = filterByPeriodo(todosClientes, filters?.periodo || "todos")
+
+        // Calcular contagens por status
+        let ativos = 0
+        let inativos = 0
+        let cancelados = 0
+
+        clientesFiltrados.forEach((cliente: any) => {
+          const status = cliente.voalle_contract_status?.toLowerCase()
+          const temContrato = cliente.ole_contract_number && cliente.ole_contract_number.toString().trim() !== ''
+
+          if (status === 'cancelado') {
+            cancelados++
+          } else if (!temContrato) {
+            inativos++
+          } else if (status === 'normal') {
+            ativos++
+          } else {
+            // Outros status com contrato são considerados ativos
+            if (temContrato) ativos++
+            else inativos++
+          }
+        })
 
         // Aplicar filtro de status se existir
         if (filters?.status) {
