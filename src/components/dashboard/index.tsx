@@ -1,5 +1,5 @@
-import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw, Download, ChevronDown, Users, UserCheck, UserX, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { LayoutGrid, Maximize2, Minimize2, BarChart3, List, RefreshCw, Download, ChevronDown, Users, UserCheck, UserX, XCircle, Settings2, GripVertical, Eye, EyeOff, RotateCcw, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { StatsOverview } from './stats-overview';
 import { ClientsChart } from './charts/clients-chart';
 import { StatusPieChart } from './charts/status-pie-chart';
@@ -10,6 +10,7 @@ import { DashboardFilters, defaultFilters } from './dashboard-filters-context';
 import { ListarTodosClientes } from '@/services/listarTodosClientes';
 import useIntegrador from '@/hooks/use-integrador';
 import { exportToCSV, clienteExportColumns } from '@/lib/export-utils';
+import { useDashboardLayout } from '@/hooks/use-dashboard-layout';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +18,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 type ExportType = 'todos' | 'ativos' | 'inativos' | 'cancelados';
 
@@ -26,12 +32,16 @@ export function Dashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
+  const [refreshKey, setRefreshKey] = useState(0);
   const integrador = useIntegrador();
+  
+  const { widgets, visibleWidgets, toggleWidget, moveWidget, resetLayout } = useDashboardLayout();
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
+    setRefreshKey(prev => prev + 1);
     setTimeout(() => setIsRefreshing(false), 1000);
-  };
+  }, []);
 
   // Formatar status do cliente
   const formatarStatus = (cliente: any): string => {
@@ -63,21 +73,18 @@ export function Dashboard() {
 
       switch (type) {
         case 'ativos':
-          // Ativos: status é "Normal"
           filteredClientes = clientes.filter((c: any) => 
             c.voalle_contract_status?.toLowerCase() === 'normal'
           );
           filename = 'clientes_ativos';
           break;
         case 'inativos':
-          // Inativos: sem contrato (ole_contract_number vazio)
           filteredClientes = clientes.filter((c: any) => 
             !c.ole_contract_number || c.ole_contract_number.toString().trim() === ''
           );
           filename = 'clientes_inativos';
           break;
         case 'cancelados':
-          // Cancelados: status é "Cancelado"
           filteredClientes = clientes.filter((c: any) => 
             c.voalle_contract_status?.toLowerCase() === 'cancelado'
           );
@@ -87,7 +94,6 @@ export function Dashboard() {
           filename = 'clientes_todos';
       }
 
-      // Formatar status para exportação
       const clientesFormatados = filteredClientes.map((c: any) => ({
         ...c,
         voalle_contract_status: formatarStatus(c)
@@ -130,6 +136,29 @@ export function Dashboard() {
     </button>
   );
 
+  const renderWidget = (widgetId: string) => {
+    switch (widgetId) {
+      case 'stats':
+        return <StatsOverview key={`stats-${refreshKey}`} filters={filters} />;
+      case 'clients-chart':
+        return (
+          <div className={viewMode === 'grid' ? 'lg:col-span-2' : ''}>
+            <ClientsChart key={`clients-${refreshKey}`} filters={filters} />
+          </div>
+        );
+      case 'status-pie':
+        return <StatusPieChart key={`pie-${refreshKey}`} filters={filters} />;
+      case 'weekly-bar':
+        return (
+          <div className={viewMode === 'grid' ? 'xl:col-span-2' : ''}>
+            <WeeklyBarChart key={`bar-${refreshKey}`} filters={filters} />
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className={`space-y-6 ${isExpanded ? 'min-h-screen' : ''} transition-all duration-300`}>
       {/* Dashboard Header */}
@@ -147,6 +176,82 @@ export function Dashboard() {
 
           {/* Controls */}
           <div className="flex items-center gap-3">
+            {/* Widget Settings */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Personalizar</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-0">
+                <div className="p-3 border-b border-border">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">Widgets do Dashboard</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={resetLayout}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Resetar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Mostre/oculte e reordene os widgets
+                  </p>
+                </div>
+                <div className="p-2 space-y-1 max-h-64 overflow-y-auto">
+                  {widgets.map((widget, index) => (
+                    <div
+                      key={widget.id}
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                        widget.visible ? 'bg-primary/5' : 'bg-muted/50'
+                      }`}
+                    >
+                      <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className={`flex-1 text-sm ${!widget.visible ? 'text-muted-foreground' : ''}`}>
+                        {widget.title}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveWidget(widget.id, 'up')}
+                          disabled={index === 0}
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveWidget(widget.id, 'down')}
+                          disabled={index === widgets.length - 1}
+                        >
+                          <ChevronDownIcon className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => toggleWidget(widget.id)}
+                        >
+                          {widget.visible ? (
+                            <Eye className="h-3.5 w-3.5 text-primary" />
+                          ) : (
+                            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -156,7 +261,7 @@ export function Dashboard() {
                   className="gap-2"
                 >
                   <Download className={`h-4 w-4 ${isExporting ? 'animate-pulse' : ''}`} />
-                  Exportar CSV
+                  <span className="hidden sm:inline">Exportar CSV</span>
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
@@ -189,7 +294,7 @@ export function Dashboard() {
               className="gap-2"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Atualizar
+              <span className="hidden sm:inline">Atualizar</span>
             </Button>
             
             <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-1">
@@ -234,11 +339,20 @@ export function Dashboard() {
             <span className="h-2 w-2 rounded-full bg-primary"></span>
             <span className="text-xs text-muted-foreground">Dados atualizados</span>
           </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="h-2 w-2 rounded-full bg-accent"></span>
+            {visibleWidgets.length} de {widgets.length} widgets visíveis
+          </div>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <StatsOverview filters={filters} />
+      {/* Widgets renderizados dinamicamente */}
+      {visibleWidgets.map(widget => {
+        if (widget.id === 'stats') {
+          return <div key={widget.id}>{renderWidget(widget.id)}</div>;
+        }
+        return null;
+      })}
 
       {/* Charts Grid */}
       <div className={`
@@ -247,15 +361,11 @@ export function Dashboard() {
         ${viewMode === 'wide' ? 'grid-cols-1 lg:grid-cols-2' : ''}
         ${viewMode === 'grid' ? 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3' : ''}
       `}>
-        <div className={viewMode === 'grid' ? 'lg:col-span-2' : ''}>
-          <ClientsChart filters={filters} />
-        </div>
-        
-        <StatusPieChart filters={filters} />
-        
-        <div className={viewMode === 'grid' ? 'xl:col-span-2' : ''}>
-          <WeeklyBarChart filters={filters} />
-        </div>
+        {visibleWidgets.filter(w => w.id !== 'stats').map(widget => (
+          <div key={widget.id}>
+            {renderWidget(widget.id)}
+          </div>
+        ))}
       </div>
     </div>
   );
