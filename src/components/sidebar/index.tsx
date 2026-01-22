@@ -6,7 +6,10 @@ import {
   User, 
   LogOut,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Moon,
+  Sun,
+  Monitor
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "@/contexts/Auth";
@@ -16,11 +19,15 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "../ui/dropdown-menu";
+import { useTheme } from "@/hooks/use-theme";
+import { Button } from "../ui/button";
 
 export default function Sidebar() {
   const { logout }: any = useContext(AuthContext);
   const location = useLocation();
+  const { theme, setTheme, isDark } = useTheme();
 
   const authData: any = localStorage.getItem("auth_user");
   const userData: any = authData ? JSON.parse(authData) : null;
@@ -74,6 +81,8 @@ export default function Sidebar() {
       .slice(0, 2);
   };
 
+  const ThemeIcon = isDark ? Moon : Sun;
+
   return (
     <aside className="w-[280px] h-screen bg-card border-r border-border flex flex-col fixed left-0 top-0 z-50">
       {/* Logo Header */}
@@ -82,10 +91,48 @@ export default function Sidebar() {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
             <Sparkles className="w-5 h-5 text-primary-foreground" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-base font-bold text-foreground">Frionline</h1>
             <p className="text-xs text-muted-foreground">Sysprov Integração</p>
           </div>
+          
+          {/* Theme Toggle */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-9 w-9 rounded-lg hover:bg-secondary"
+              >
+                <ThemeIcon className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 bg-popover border border-border z-50">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Tema</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setTheme("light")}
+                className={`gap-2 cursor-pointer ${theme === 'light' ? 'bg-secondary' : ''}`}
+              >
+                <Sun className="h-4 w-4" />
+                Claro
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setTheme("dark")}
+                className={`gap-2 cursor-pointer ${theme === 'dark' ? 'bg-secondary' : ''}`}
+              >
+                <Moon className="h-4 w-4" />
+                Escuro
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setTheme("system")}
+                className={`gap-2 cursor-pointer ${theme === 'system' ? 'bg-secondary' : ''}`}
+              >
+                <Monitor className="h-4 w-4" />
+                Sistema
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -150,7 +197,7 @@ export default function Sidebar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             align="end" 
-            className="w-56 bg-popover border border-border shadow-elevated"
+            className="w-56 bg-popover border border-border shadow-elevated z-50"
           >
             <div className="px-3 py-2">
               <p className="text-sm font-medium text-foreground">{name}</p>
