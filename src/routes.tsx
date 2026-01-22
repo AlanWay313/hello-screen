@@ -10,6 +10,7 @@ import Financeiro from "./pages/Financeiro";
 import { Configuracoes } from "./pages/Configuracoes";
 import { Usuarios } from "./pages/Usuarios";
 import Conta from "./pages/Conta";
+import { Changelog } from "./pages/Changelog";
 
 
 const isLogged = (): boolean => {
@@ -76,8 +77,8 @@ export const routes = createBrowserRouter([
       { path: "financeiro", element: <AdminRoute element={<Financeiro />} /> },
       { path: "configuracoes", element: <PrivateRoute element={<Configuracoes />} /> },
       { path: "usuarios", element: <PrivateRoute element={<Usuarios />} /> },
-      { path: "conta", element: <Conta />} ,
-   
+      { path: "conta", element: <Conta />},
+      { path: "changelog", element: <PrivateRoute element={<Changelog />} /> },
     ],
   },
   {
