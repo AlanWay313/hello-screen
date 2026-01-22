@@ -39,8 +39,17 @@ export function StatsOverview({ filters }: StatsOverviewProps) {
       try {
         const todosClientes = await ListarTodosClientes(integrador)
 
+        // DEBUG: Verificar campos disponíveis na API
+        if (todosClientes.length > 0) {
+          console.log("=== DEBUG API - Campos disponíveis ===")
+          console.log("Primeiro cliente (todos os campos):", todosClientes[0])
+          console.log("Campos do objeto:", Object.keys(todosClientes[0]))
+          console.log("Total de clientes:", todosClientes.length)
+        }
+
         // Aplicar filtro de período usando created_at
         const clientesFiltrados = filterByPeriodo(todosClientes, filters?.periodo || "todos")
+        console.log("Clientes após filtro de período:", clientesFiltrados.length, "período:", filters?.periodo)
 
         // Calcular contagens por status
         let ativos = 0
