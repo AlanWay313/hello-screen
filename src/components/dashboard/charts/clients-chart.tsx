@@ -83,22 +83,24 @@ export function ClientsChart({ filters }: ClientsChartProps) {
           total: displayAtivos + displayInativos,
         })
 
-        // Usar dados do histórico real
-        const historicalData = getChartData()
-        
-        if (historicalData.length > 0) {
-          setData(historicalData)
-        } else {
-          // Se não há histórico ainda, mostrar apenas o mês atual
-          const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-          const now = new Date()
-          const monthLabel = `${monthNames[now.getMonth()]}/${String(now.getFullYear()).slice(-2)}`
-          setData([{
-            month: monthLabel,
-            ativos: ativos,
-            novos: 0,
-          }])
-        }
+        // Usar dados do histórico real (chamado após saveSnapshot)
+        setTimeout(() => {
+          const historicalData = getChartData()
+          
+          if (historicalData.length > 0) {
+            setData(historicalData)
+          } else {
+            // Se não há histórico ainda, mostrar apenas o mês atual
+            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+            const now = new Date()
+            const monthLabel = `${monthNames[now.getMonth()]}/${String(now.getFullYear()).slice(-2)}`
+            setData([{
+              month: monthLabel,
+              ativos: ativos,
+              novos: 0,
+            }])
+          }
+        }, 100)
       } catch (error) {
         console.error("Erro ao buscar dados:", error)
       } finally {
@@ -107,7 +109,8 @@ export function ClientsChart({ filters }: ClientsChartProps) {
     }
 
     fetchData()
-  }, [integrador, filters, saveSnapshot, getChartData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [integrador, filters])
 
   const formatNumber = (num: number) => num.toLocaleString('pt-BR')
   const retencao = stats.total > 0 ? ((stats.ativos / stats.total) * 100).toFixed(1) : "0"
