@@ -696,8 +696,21 @@ export function TabelaLogs() {
     info: data.filter(item => item.codeLog?.toLowerCase() === 'info').length,
   });
 
+  // Padrões de logs a serem omitidos (poluição)
+  const omittedPatterns = [
+    /cpf\s*(já\s*)?cadastrado/i,
+    /cnpj\s*(já\s*)?cadastrado/i,
+    /documento\s*(já\s*)?cadastrado/i,
+  ];
+
+  const shouldOmitLog = (log: LogData) => {
+    const textToCheck = `${log.title || ''} ${log.acao || ''}`.toLowerCase();
+    return omittedPatterns.some(pattern => pattern.test(textToCheck));
+  };
+
   const applyFilters = React.useCallback((data: LogData[]) => {
-    let filtered = [...data];
+    // Primeiro, omite os logs de CPF/CNPJ já cadastrado
+    let filtered = data.filter(item => !shouldOmitLog(item));
 
     if (dateFilters.startDate) {
       const [year, month, day] = dateFilters.startDate.split('-').map(Number);
