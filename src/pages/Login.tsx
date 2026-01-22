@@ -2,6 +2,7 @@ import { useState, useContext } from "react";
 import { Eye, EyeOff, KeyRound, Mail, ArrowRight, Building2 } from "lucide-react";
 import { AuthContext } from "@/contexts/Auth";
 import logo from '../../public/logo.jpeg';
+import logoOletv from '@/assets/logo-oletv.png';
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -30,12 +31,12 @@ export default function Login() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden mb-10 flex items-center justify-center gap-3">
-            <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md">
-              <img src={logo} alt="Logo" className="w-full h-full object-cover" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md">
+              <img src={logo} alt="SysProv" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <span className="text-xl font-semibold text-slate-900">SysProv</span>
-              <span className="text-xl font-semibold text-slate-400"> + Olé TV</span>
+            <span className="text-slate-400 text-lg">+</span>
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md bg-slate-100 flex items-center justify-center p-1">
+              <img src={logoOletv} alt="Olé TV" className="w-full h-full object-contain" />
             </div>
           </div>
 
@@ -155,14 +156,14 @@ export default function Login() {
 
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between w-full p-12">
-          {/* Top - Logo */}
-          <div className="flex items-center gap-3">
+          {/* Top - Logos */}
+          <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/10">
-              <img src={logo} alt="Logo" className="w-full h-full object-cover" />
+              <img src={logo} alt="SysProv" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <span className="text-xl font-semibold text-white">SysProv</span>
-              <span className="text-xl font-semibold text-slate-400"> + Olé TV</span>
+            <span className="text-slate-500 text-lg">+</span>
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-1">
+              <img src={logoOletv} alt="Olé TV" className="w-full h-full object-contain" />
             </div>
           </div>
 
