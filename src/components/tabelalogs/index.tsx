@@ -637,6 +637,10 @@ const AdvancedFilters = ({
 };
 
 export function TabelaLogs() {
+  // Ler parâmetro de busca da URL (vindo das notificações)
+  const searchParams = new URLSearchParams(window.location.search);
+  const urlSearchParam = searchParams.get('search') || '';
+  
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "created_at", desc: true }]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -650,7 +654,14 @@ export function TabelaLogs() {
     endDate: '',
     datePreset: ''
   });
-  const [globalFilter, setGlobalFilter] = React.useState('');
+  const [globalFilter, setGlobalFilter] = React.useState(urlSearchParam);
+  
+  // Atualizar filtro quando URL mudar
+  React.useEffect(() => {
+    if (urlSearchParam) {
+      setGlobalFilter(urlSearchParam);
+    }
+  }, [urlSearchParam]);
   
   const integrador: any = useIntegrador();
 
