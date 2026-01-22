@@ -8,7 +8,8 @@ import {
   Moon,
   Sun,
   Monitor,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "@/contexts/Auth";
@@ -60,6 +61,12 @@ export default function Sidebar() {
   ];
 
   const bottomItems = [
+    { 
+      icon: Sparkles, 
+      name: "Novidades", 
+      link: "/changelog",
+      description: "Histórico de atualizações"
+    },
     { 
       icon: User, 
       name: "Minha Conta", 
