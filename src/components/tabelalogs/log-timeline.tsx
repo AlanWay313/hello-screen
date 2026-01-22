@@ -1,5 +1,4 @@
 import * as React from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { 
   AlertCircle, 
   AlertTriangle, 
@@ -33,7 +32,10 @@ interface LogTimelineProps {
   onViewDetails: (log: LogData) => void;
 }
 
-const getStatusConfig = (status: string) => {
+// Cache para configs de status
+const statusConfigCache = new Map<string, ReturnType<typeof getStatusConfigInternal>>();
+
+const getStatusConfigInternal = (status: string) => {
   switch (status?.toLowerCase()) {
     case 'error':
       return { 
@@ -93,6 +95,14 @@ const getStatusConfig = (status: string) => {
   }
 };
 
+const getStatusConfig = (status: string) => {
+  const key = status?.toLowerCase() || '';
+  if (!statusConfigCache.has(key)) {
+    statusConfigCache.set(key, getStatusConfigInternal(status));
+  }
+  return statusConfigCache.get(key)!;
+};
+
 const formatTime = (dateString: string) => {
   const date = new Date(dateString);
   return date.toLocaleTimeString("pt-BR", {
@@ -103,16 +113,16 @@ const formatTime = (dateString: string) => {
 
 const isRecent = (dateString: string, hoursAgo: number = 2) => {
   const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const now = Date.now();
+  const diffMs = now - date.getTime();
   const diffHours = diffMs / (1000 * 60 * 60);
   return diffHours <= hoursAgo;
 };
 
 const getTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const now = Date.now();
+  const diffMs = now - date.getTime();
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   
   if (diffMinutes < 1) return 'agora';
@@ -122,70 +132,25 @@ const getTimeAgo = (dateString: string) => {
   return formatTime(dateString);
 };
 
-// Prioriza erros e avisos recentes
-const prioritizeLogs = (logs: LogData[]) => {
-  return [...logs].sort((a, b) => {
-    const aRecent = isRecent(a.created_at);
-    const bRecent = isRecent(b.created_at);
-    const aConfig = getStatusConfig(a.codeLog);
-    const bConfig = getStatusConfig(b.codeLog);
-    
-    // Primeiro: erros/avisos recentes
-    if (aRecent && !bRecent && aConfig.priority >= 2) return -1;
-    if (bRecent && !aRecent && bConfig.priority >= 2) return 1;
-    
-    // Segundo: por prioridade se ambos recentes
-    if (aRecent && bRecent) {
-      if (aConfig.priority !== bConfig.priority) {
-        return bConfig.priority - aConfig.priority;
-      }
-    }
-    
-    // Terceiro: por data
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-};
-
-const groupByDate = (logs: LogData[]) => {
-  const groups: { [key: string]: LogData[] } = {};
-  
-  logs.forEach(log => {
-    const date = new Date(log.created_at);
-    const key = date.toISOString().split('T')[0];
-    if (!groups[key]) {
-      groups[key] = [];
-    }
-    groups[key].push(log);
-  });
-  
-  return Object.entries(groups)
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([date, logs]) => ({
-      date,
-      logs: prioritizeLogs(logs)
-    }));
-};
-
-const TimelineItem = ({ 
+// Item de timeline otimizado com React.memo
+const TimelineItem = React.memo(({ 
   log, 
-  index, 
   onViewDetails,
   isLast,
   isPriority
 }: { 
   log: LogData; 
-  index: number;
   onViewDetails: (log: LogData) => void;
   isLast: boolean;
   isPriority: boolean;
 }) => {
-  const [isExpanded, setIsExpanded] = React.useState(isPriority);
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const config = getStatusConfig(log.codeLog);
   const Icon = config.icon;
   const recent = isRecent(log.created_at);
 
-  const copyToClipboard = async () => {
+  const copyToClipboard = React.useCallback(async () => {
     try {
       await navigator.clipboard.writeText(log.acao);
       setCopied(true);
@@ -193,44 +158,39 @@ const TimelineItem = ({
     } catch (error) {
       console.error('Erro ao copiar:', error);
     }
-  };
+  }, [log.acao]);
+
+  const handleViewDetails = React.useCallback(() => {
+    onViewDetails(log);
+  }, [onViewDetails, log]);
+
+  const toggleExpand = React.useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.3 }}
-      className="relative flex gap-4 group"
-    >
-      {/* Timeline line */}
+    <div className="relative flex gap-4 group animate-fade-in">
+      {/* Timeline line - simplificado */}
       {!isLast && (
-        <div className="absolute left-[19px] top-12 bottom-0 w-0.5 bg-gradient-to-b from-border via-border/50 to-transparent" />
+        <div className="absolute left-[19px] top-12 bottom-0 w-0.5 bg-border/50" />
       )}
       
-      {/* Timeline dot */}
+      {/* Timeline dot - sem animação */}
       <div className="relative z-10 flex-shrink-0">
-        <motion.div 
-          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-lg ${config.glow} ${isPriority ? 'ring-2 ring-offset-2 ring-offset-background ring-destructive/50' : ''}`}
-          whileHover={{ scale: 1.1 }}
-          transition={{ type: "spring", stiffness: 400 }}
-          animate={isPriority ? { scale: [1, 1.05, 1] } : {}}
+        <div 
+          className={`w-10 h-10 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-md ${isPriority ? 'ring-2 ring-offset-2 ring-offset-background ring-destructive/50' : ''}`}
         >
           <Icon className="h-5 w-5 text-white" />
-        </motion.div>
+        </div>
         {isPriority && (
-          <motion.div 
-            className="absolute -top-1 -right-1 p-1 bg-destructive rounded-full"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2 }}
-          >
+          <div className="absolute -top-1 -right-1 p-1 bg-destructive rounded-full">
             <Flame className="h-2.5 w-2.5 text-white" />
-          </motion.div>
+          </div>
         )}
       </div>
       
-      {/* Content */}
-      <Card className={`flex-1 mb-4 overflow-hidden border ${config.border} ${isPriority ? 'bg-destructive/5 border-destructive/40 shadow-md' : 'bg-card/50'} backdrop-blur-sm hover:shadow-md transition-all duration-300 group-hover:border-primary/30`}>
+      {/* Content - simplificado */}
+      <Card className={`flex-1 mb-4 overflow-hidden border ${config.border} ${isPriority ? 'bg-destructive/5 border-destructive/40' : 'bg-card/50'} transition-shadow hover:shadow-md`}>
         <div className="p-4">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
@@ -248,27 +208,20 @@ const TimelineItem = ({
                     Atenção
                   </Badge>
                 )}
-                {recent && !isPriority && (
-                  <Badge variant="outline" className="text-xs border-primary/30 text-primary">
-                    Recente
-                  </Badge>
-                )}
               </div>
               <h4 className="font-semibold text-foreground truncate" title={log.title}>
                 {log.title}
               </h4>
             </div>
             
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="text-right">
-                <p className={`text-sm font-medium ${recent ? 'text-primary' : 'text-foreground'}`}>
-                  {recent ? getTimeAgo(log.created_at) : formatTime(log.created_at)}
-                </p>
-              </div>
+            <div className="text-right flex-shrink-0">
+              <p className={`text-sm font-medium ${recent ? 'text-primary' : 'text-foreground'}`}>
+                {recent ? getTimeAgo(log.created_at) : formatTime(log.created_at)}
+              </p>
             </div>
           </div>
           
-          {/* Description preview */}
+          {/* Description */}
           <div className="mt-3">
             <p className={`text-sm text-muted-foreground ${isExpanded ? '' : 'line-clamp-2'}`}>
               {log.acao}
@@ -278,8 +231,8 @@ const TimelineItem = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="mt-1 h-7 px-2 text-xs text-primary hover:text-primary"
+                onClick={toggleExpand}
+                className="mt-1 h-7 px-2 text-xs text-primary"
               >
                 {isExpanded ? (
                   <>
@@ -301,7 +254,7 @@ const TimelineItem = ({
             <Button
               variant={isPriority ? "default" : "outline"}
               size="sm"
-              onClick={() => onViewDetails(log)}
+              onClick={handleViewDetails}
               className="h-8 gap-1.5 text-xs"
             >
               <Eye className="h-3.5 w-3.5" />
@@ -328,36 +281,41 @@ const TimelineItem = ({
           </div>
         </div>
       </Card>
-    </motion.div>
+    </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison para evitar re-renders desnecessários
+  return prevProps.log.id_cliente === nextProps.log.id_cliente &&
+         prevProps.log.created_at === nextProps.log.created_at &&
+         prevProps.isLast === nextProps.isLast &&
+         prevProps.isPriority === nextProps.isPriority;
+});
 
-const DateHeader = ({ date, count, criticalCount }: { date: string; count: number; criticalCount: number }) => {
-  const dateObj = new Date(date + 'T12:00:00');
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const isToday = dateObj.toDateString() === today.toDateString();
-  const isYesterday = dateObj.toDateString() === yesterday.toDateString();
-  
-  const displayDate = isToday 
-    ? 'Hoje' 
-    : isYesterday 
-    ? 'Ontem' 
-    : dateObj.toLocaleDateString('pt-BR', { 
-        weekday: 'long', 
-        day: '2-digit', 
-        month: 'long',
-        year: 'numeric'
-      });
+TimelineItem.displayName = 'TimelineItem';
+
+// Header de data otimizado
+const DateHeader = React.memo(({ date, count, criticalCount }: { date: string; count: number; criticalCount: number }) => {
+  const displayDate = React.useMemo(() => {
+    const dateObj = new Date(date + 'T12:00:00');
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const isToday = dateObj.toDateString() === today.toDateString();
+    const isYesterday = dateObj.toDateString() === yesterday.toDateString();
+    
+    if (isToday) return 'Hoje';
+    if (isYesterday) return 'Ontem';
+    return dateObj.toLocaleDateString('pt-BR', { 
+      weekday: 'long', 
+      day: '2-digit', 
+      month: 'long',
+      year: 'numeric'
+    });
+  }, [date]);
 
   return (
-    <motion.div 
-      className="flex items-center gap-3 mb-4 mt-6 first:mt-0"
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
+    <div className="flex items-center gap-3 mb-4 mt-6 first:mt-0 animate-fade-in">
       <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/10 to-accent/10 rounded-xl border border-primary/20">
         <Clock className="h-4 w-4 text-primary" />
         <span className="font-semibold text-foreground capitalize">{displayDate}</span>
@@ -372,95 +330,163 @@ const DateHeader = ({ date, count, criticalCount }: { date: string; count: numbe
         </Badge>
       )}
       <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent" />
-    </motion.div>
+    </div>
   );
-};
+});
 
-// Alerta de erros recentes no topo
-const RecentAlertsHeader = ({ alerts }: { alerts: LogData[] }) => {
-  if (alerts.length === 0) return null;
+DateHeader.displayName = 'DateHeader';
+
+// Alerta de erros recentes
+const RecentAlertsHeader = React.memo(({ count }: { count: number }) => {
+  if (count === 0) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-6 p-4 bg-gradient-to-r from-destructive/10 via-warning/10 to-transparent rounded-xl border border-destructive/30"
-    >
-      <div className="flex items-center gap-3 mb-2">
+    <div className="mb-6 p-4 bg-gradient-to-r from-destructive/10 via-warning/10 to-transparent rounded-xl border border-destructive/30 animate-fade-in">
+      <div className="flex items-center gap-3">
         <div className="p-2 bg-destructive/20 rounded-lg">
           <AlertCircle className="h-5 w-5 text-destructive" />
         </div>
         <div>
           <h3 className="font-semibold text-foreground">Atenção Necessária</h3>
           <p className="text-sm text-muted-foreground">
-            {alerts.length} {alerts.length === 1 ? 'erro ou aviso recente requer' : 'erros ou avisos recentes requerem'} sua atenção
+            {count} {count === 1 ? 'erro ou aviso recente requer' : 'erros ou avisos recentes requerem'} sua atenção
           </p>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
-};
+});
 
-export function LogTimeline({ data, onViewDetails }: LogTimelineProps) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [visibleItems, setVisibleItems] = React.useState(15);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+RecentAlertsHeader.displayName = 'RecentAlertsHeader';
+
+// Processar dados uma vez só
+interface ProcessedData {
+  groups: Array<{
+    date: string;
+    logs: LogData[];
+    criticalCount: number;
+  }>;
+  recentAlertsCount: number;
+}
+
+const processLogs = (data: LogData[]): ProcessedData => {
+  const groups: { [key: string]: LogData[] } = {};
+  let recentAlertsCount = 0;
   
-  // Processar e agrupar logs
-  const groupedLogs = React.useMemo(() => groupByDate(data), [data]);
-  
-  // Flatten para infinite scroll
-  const allItems = React.useMemo(() => {
-    const items: { type: 'header' | 'log'; data: any; date?: string; criticalCount?: number }[] = [];
+  // Agrupar por data
+  data.forEach(log => {
+    const dateKey = new Date(log.created_at).toISOString().split('T')[0];
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(log);
     
-    groupedLogs.forEach(group => {
-      const criticalCount = group.logs.filter(log => {
+    // Contar alertas recentes
+    const config = getStatusConfig(log.codeLog);
+    if (config.priority >= 2 && isRecent(log.created_at)) {
+      recentAlertsCount++;
+    }
+  });
+  
+  // Ordenar e processar grupos
+  const sortedGroups = Object.entries(groups)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, logs]) => {
+      // Ordenar logs: prioridade + recência
+      const sortedLogs = [...logs].sort((a, b) => {
+        const aConfig = getStatusConfig(a.codeLog);
+        const bConfig = getStatusConfig(b.codeLog);
+        const aRecent = isRecent(a.created_at);
+        const bRecent = isRecent(b.created_at);
+        
+        // Erros/avisos recentes primeiro
+        const aScore = (aRecent && aConfig.priority >= 2) ? 100 : 0;
+        const bScore = (bRecent && bConfig.priority >= 2) ? 100 : 0;
+        
+        if (aScore !== bScore) return bScore - aScore;
+        
+        // Depois por data
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      
+      const criticalCount = sortedLogs.filter(log => {
         const config = getStatusConfig(log.codeLog);
         return config.priority >= 2 && isRecent(log.created_at);
       }).length;
       
-      items.push({ type: 'header', data: group.date, date: group.date, criticalCount });
-      group.logs.forEach(log => {
-        items.push({ type: 'log', data: log, date: group.date });
+      return { date, logs: sortedLogs, criticalCount };
+    });
+  
+  return { groups: sortedGroups, recentAlertsCount };
+};
+
+export function LogTimeline({ data, onViewDetails }: LogTimelineProps) {
+  const [visibleCount, setVisibleCount] = React.useState(20);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const observerRef = React.useRef<IntersectionObserver | null>(null);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+
+  // Processar dados apenas quando mudam
+  const processed = React.useMemo(() => processLogs(data), [data]);
+  
+  // Flatten para renderização
+  const flatItems = React.useMemo(() => {
+    const items: Array<{ type: 'header' | 'log'; key: string; data: any; groupDate?: string; criticalCount?: number }> = [];
+    
+    processed.groups.forEach(group => {
+      items.push({ 
+        type: 'header', 
+        key: `header-${group.date}`, 
+        data: group.date,
+        criticalCount: group.criticalCount
+      });
+      
+      group.logs.forEach((log, idx) => {
+        items.push({ 
+          type: 'log', 
+          key: `log-${group.date}-${log.id_cliente}-${idx}`, 
+          data: log,
+          groupDate: group.date
+        });
       });
     });
     
     return items;
-  }, [groupedLogs]);
+  }, [processed.groups]);
 
-  // Alertas recentes (erros/avisos das últimas 2 horas)
-  const recentAlerts = React.useMemo(() => {
-    return data.filter(log => {
-      const config = getStatusConfig(log.codeLog);
-      return config.priority >= 2 && isRecent(log.created_at);
-    });
+  // Reset ao mudar dados
+  React.useEffect(() => {
+    setVisibleCount(20);
   }, [data]);
 
-  // Infinite scroll com Intersection Observer
+  // Infinite scroll com IntersectionObserver
   React.useEffect(() => {
-    const observer = new IntersectionObserver(
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && visibleItems < allItems.length) {
+        if (entries[0].isIntersecting && visibleCount < flatItems.length && !isLoadingMore) {
           setIsLoadingMore(true);
-          setTimeout(() => {
-            setVisibleItems(prev => Math.min(prev + 10, allItems.length));
-            setIsLoadingMore(false);
-          }, 300);
+          // Usar requestAnimationFrame para não bloquear
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              setVisibleCount(prev => Math.min(prev + 15, flatItems.length));
+              setIsLoadingMore(false);
+            }, 100);
+          });
         }
       },
-      { threshold: 0.1, rootMargin: '100px' }
+      { threshold: 0.1, rootMargin: '200px' }
     );
 
-    const sentinel = document.getElementById('timeline-sentinel');
-    if (sentinel) observer.observe(sentinel);
+    if (sentinelRef.current) {
+      observerRef.current.observe(sentinelRef.current);
+    }
 
-    return () => observer.disconnect();
-  }, [visibleItems, allItems.length]);
-
-  // Reset quando dados mudam
-  React.useEffect(() => {
-    setVisibleItems(15);
-  }, [data]);
+    return () => observerRef.current?.disconnect();
+  }, [visibleCount, flatItems.length, isLoadingMore]);
 
   if (data.length === 0) {
     return (
@@ -474,82 +500,65 @@ export function LogTimeline({ data, onViewDetails }: LogTimelineProps) {
     );
   }
 
-  const displayedItems = allItems.slice(0, visibleItems);
-  const hasMore = visibleItems < allItems.length;
-
-  // Rastrear índice por grupo para animação
-  let currentGroupIndex = 0;
+  const visibleItems = flatItems.slice(0, visibleCount);
+  const hasMore = visibleCount < flatItems.length;
 
   return (
-    <div className="relative" ref={containerRef}>
-      {/* Alertas recentes no topo */}
-      <RecentAlertsHeader alerts={recentAlerts} />
+    <div className="relative">
+      {/* Alertas recentes */}
+      <RecentAlertsHeader count={processed.recentAlertsCount} />
 
-      <AnimatePresence mode="sync">
-        {displayedItems.map((item, idx) => {
-          if (item.type === 'header') {
-            currentGroupIndex = 0;
-            const logsInGroup = groupedLogs.find(g => g.date === item.date)?.logs || [];
-            return (
-              <DateHeader 
-                key={`header-${item.data}`} 
-                date={item.data} 
-                count={logsInGroup.length}
-                criticalCount={item.criticalCount || 0}
-              />
-            );
-          }
-          
-          const log = item.data as LogData;
-          const config = getStatusConfig(log.codeLog);
-          const isPriority = config.priority >= 2 && isRecent(log.created_at);
-          const isLastInGroup = idx === displayedItems.length - 1 || displayedItems[idx + 1]?.type === 'header';
-          
-          const itemIndex = currentGroupIndex;
-          currentGroupIndex++;
-
+      {/* Lista virtualizada simplificada */}
+      {visibleItems.map((item, idx) => {
+        if (item.type === 'header') {
+          const group = processed.groups.find(g => g.date === item.data);
           return (
-            <div key={`log-${log.id_cliente}-${log.created_at}-${idx}`} className="ml-1">
-              <TimelineItem
-                log={log}
-                index={itemIndex}
-                onViewDetails={onViewDetails}
-                isLast={isLastInGroup && !hasMore}
-                isPriority={isPriority}
-              />
-            </div>
+            <DateHeader 
+              key={item.key}
+              date={item.data} 
+              count={group?.logs.length || 0}
+              criticalCount={item.criticalCount || 0}
+            />
           );
-        })}
-      </AnimatePresence>
+        }
+        
+        const log = item.data as LogData;
+        const config = getStatusConfig(log.codeLog);
+        const isPriority = config.priority >= 2 && isRecent(log.created_at);
+        const isLast = idx === visibleItems.length - 1 && !hasMore;
+        
+        return (
+          <div key={item.key} className="ml-1">
+            <TimelineItem
+              log={log}
+              onViewDetails={onViewDetails}
+              isLast={isLast}
+              isPriority={isPriority}
+            />
+          </div>
+        );
+      })}
 
       {/* Sentinel para infinite scroll */}
-      <div id="timeline-sentinel" className="h-4" />
+      <div ref={sentinelRef} className="h-4" />
 
-      {/* Loading indicator */}
+      {/* Loading */}
       {isLoadingMore && (
-        <motion.div 
-          className="flex justify-center py-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
+        <div className="flex justify-center py-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Carregando mais...</span>
+            <span className="text-sm">Carregando...</span>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* Info de quantos restam */}
+      {/* Info restantes */}
       {hasMore && !isLoadingMore && (
-        <motion.div 
-          className="flex justify-center pt-2 pb-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
+        <div className="flex justify-center pt-2 pb-4">
           <span className="text-xs text-muted-foreground">
-            Role para ver mais ({allItems.length - visibleItems} itens restantes)
+            Role para ver mais ({flatItems.length - visibleCount} restantes)
           </span>
-        </motion.div>
+        </div>
       )}
     </div>
   );
