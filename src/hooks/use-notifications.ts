@@ -186,17 +186,16 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         const codeLog = log.codeLog?.toLowerCase() || '';
         const clienteId = log.id_cliente || '';
         const clienteNome = log.nome_cliente || log.cliente_nome || '';
+        const logTitle = log.title || '';
         
         // FILTRO PRINCIPAL: Apenas cadastros e erros
         
-        // 1. Novo cliente cadastrado
+        // 1. Sucesso/Novo cadastro - título genérico
         if (newClientPatterns.some(p => p.test(text)) || codeLog === 'success') {
           addNotification({
             type: 'new_client',
-            title: 'Novo Cliente Cadastrado',
-            message: clienteNome 
-              ? `${clienteNome} (${clienteId})` 
-              : log.title || `Documento: ${clienteId}`,
+            title: clienteNome || 'Atualização de Cliente',
+            message: logTitle || 'Integração realizada com sucesso',
             data: { ...log, clienteId, clienteNome },
           });
         }
@@ -204,8 +203,8 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         else if (codeLog === 'error') {
           addNotification({
             type: 'error',
-            title: clienteNome ? `Erro: ${clienteNome}` : 'Erro de Integração',
-            message: log.title || log.acao?.substring(0, 100) || 'Erro detectado',
+            title: clienteNome || 'Erro de Integração',
+            message: logTitle || log.acao?.substring(0, 100) || 'Erro detectado',
             data: { ...log, clienteId, clienteNome },
           });
         }

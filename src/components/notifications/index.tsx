@@ -123,7 +123,7 @@ const NotificationItem = ({
           </p>
           
           <div className="flex items-center gap-1 mt-2">
-            {/* Botão de ação principal */}
+            {/* Botão de ação - sempre direciona para logs */}
             <Button
               variant="ghost"
               size="sm"
@@ -134,7 +134,7 @@ const NotificationItem = ({
               className="h-6 px-2 text-xs text-primary hover:text-primary"
             >
               <ExternalLink className="h-3 w-3 mr-1" />
-              {notification.type === 'new_client' ? 'Ver cliente' : 'Ver logs'}
+              Ver detalhes
             </Button>
             
             <div className="flex-1" />
@@ -187,12 +187,11 @@ export function NotificationsButton() {
     setOpen(false);
     const clienteId = notification.data?.clienteId || notification.data?.id_cliente;
     
-    if (notification.type === 'new_client' && clienteId) {
-      // Navega para clientes com filtro do documento
-      navigate(`/clientes?search=${encodeURIComponent(clienteId)}`);
+    // Sempre navega para logs com o documento preenchido na busca
+    if (clienteId) {
+      navigate(`/logs?search=${encodeURIComponent(clienteId)}`);
     } else {
-      // Navega para logs com filtro do documento
-      navigate(`/logs?search=${encodeURIComponent(clienteId || '')}`);
+      navigate('/logs');
     }
   };
 
