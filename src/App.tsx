@@ -1,4 +1,5 @@
 import Sidebar from "./components/sidebar"
+import Header from "./components/header"
 import { AnimatedOutlet } from "./components/animated-outlet"
 
 function App() {
@@ -8,11 +9,17 @@ function App() {
       <Sidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 ml-[280px] min-h-screen overflow-hidden">
-        <div className="p-6">
-          <AnimatedOutlet />
-        </div>
-      </main>
+      <div className="flex-1 ml-[260px] min-h-screen flex flex-col">
+        {/* Header */}
+        <Header />
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-auto">
+          <div className="p-6">
+            <AnimatedOutlet />
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
