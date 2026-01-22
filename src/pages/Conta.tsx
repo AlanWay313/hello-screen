@@ -1,126 +1,162 @@
 import { useState } from "react";
-import { User, Shield, Mail, Key } from "lucide-react";
+import { User, Shield, Mail, Key, Settings, UserCircle, ChevronRight } from "lucide-react";
 import useUserId from "@/hooks/use-user";
-
 import userDataData from "@/hooks/use-usersall";
 import { AlterarSenhaModal } from "@/components/mudarsenha";
-
-
-
-
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 const userData = userDataData();
+
 export default function Conta() {
   const [showModal, setShowModal] = useState(false);
   const idUser = useUserId();
-
 
   const handleChangePassword = () => {
     setShowModal(true);
   };
 
-
-
-
   return (
-    <div className=" mx-auto p-6 space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header da Página */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Minha Conta</h1>
-        <p className="text-gray-600">Gerencie suas informações pessoais e configurações de segurança</p>
+      <div className="flex items-center gap-4">
+        <div className="p-3 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl">
+          <UserCircle className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Minha Conta</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie suas informações pessoais e configurações de segurança
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Informações do Perfil */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Informações do Perfil</h2>
-           {/*    <button
-                onClick={handleEditProfile}
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors duration-200"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Editar
-              </button> */}
-            </div>
-
-            <div className="flex items-center space-x-4 mb-6">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                {userData.avatar ? (
-                  <img src={userData.avatar} alt="Avatar" className="w-16 h-16 rounded-full" />
-                ) : (
-                  <User className="w-8 h-8 text-white" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900">{userData.name}</h3>
-                <p className="text-gray-500">Conta {userData.accountType}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Mail className="w-5 h-5 text-gray-400" />
+          <Card className="border-border shadow-card">
+            <CardHeader className="border-b border-border bg-gradient-to-r from-primary/5 to-accent/5">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Email</p>
-                  <p className="text-sm text-gray-600">{userData.email}</p>
+                  <CardTitle className="text-lg">Informações do Perfil</CardTitle>
+                  <CardDescription>Seus dados pessoais cadastrados no sistema</CardDescription>
                 </div>
+                <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-success mr-1.5" />
+                  Conta ativa
+                </Badge>
               </div>
-              
-           {/*    <div className="flex items-center space-x-3">
-                <Calendar className="w-5 h-5 text-gray-400" />
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+                  {userData.avatar ? (
+                    <img 
+                      src={userData.avatar} 
+                      alt="Avatar" 
+                      className="h-16 w-16 rounded-full object-cover" 
+                    />
+                  ) : (
+                    <User className="h-8 w-8 text-white" />
+                  )}
+                </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Membro desde</p>
-                  <p className="text-sm text-gray-600">{userData.joinDate}</p>
+                  <h3 className="text-xl font-semibold text-foreground">{userData.name}</h3>
+                  <p className="text-muted-foreground flex items-center gap-1.5">
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {userData.accountType || "Usuário"}
+                    </Badge>
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
-                <User className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Último acesso</p>
-                  <p className="text-sm text-gray-600">{userData.lastLogin}</p>
+              <Separator className="my-6" />
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Mail className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      E-mail
+                    </p>
+                    <p className="text-foreground font-medium">{userData.email}</p>
+                  </div>
                 </div>
-              </div> */}
-            </div>
-          </div>
+
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Nome de Usuário
+                    </p>
+                    <p className="text-foreground font-medium font-mono">{userData.username || userData.name}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Painel de Ações */}
+        {/* Painel de Segurança */}
         <div className="space-y-4">
-          {/* Segurança */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center mb-4">
-              <Shield className="w-5 h-5 text-green-600 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-900">Segurança</h3>
-            </div>
-            
-            <div className="space-y-3">
-              <button
+          <Card className="border-border shadow-card">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-success/10 rounded-lg">
+                  <Shield className="h-4 w-4 text-success" />
+                </div>
+                <CardTitle className="text-base">Segurança</CardTitle>
+              </div>
+              <CardDescription>Gerencie suas credenciais de acesso</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                variant="outline"
                 onClick={handleChangePassword}
-                className="w-full flex items-center justify-between p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                className="w-full justify-between h-auto py-3 px-4 hover:bg-muted"
               >
-                <div className="flex items-center">
-                  <Key className="w-4 h-4 text-gray-500 mr-3" />
-                  <span className="text-sm font-medium text-gray-900">Alterar Senha</span>
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-warning/10 rounded-md">
+                    <Key className="h-4 w-4 text-warning" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium">Alterar Senha</p>
+                    <p className="text-xs text-muted-foreground">Atualize sua senha de acesso</p>
+                  </div>
                 </div>
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </Button>
 
-              {/* <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                  <span className="text-sm text-green-800">Conta verificada</span>
+              <div className="p-3 bg-success/5 border border-success/20 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
+                  <span className="text-sm text-success font-medium">Conta verificada</span>
                 </div>
-              </div> */}
-            </div>
-          </div>
+                <p className="text-xs text-muted-foreground mt-1 ml-4">
+                  Sua conta está protegida e ativa
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Configurações Rápidas */}
-          
+          {/* Card de Configurações (opcional para futuro) */}
+          <Card className="border-border shadow-card border-dashed">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Settings className="h-5 w-5" />
+                <div>
+                  <p className="text-sm font-medium">Mais configurações</p>
+                  <p className="text-xs">Em breve...</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
