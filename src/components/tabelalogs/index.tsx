@@ -33,8 +33,12 @@ import {
   RefreshCw,
   AlertTriangle,
   Info,
-  Activity
+  Activity,
+  LayoutList,
+  GitCommitHorizontal
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { LogTimeline } from "./log-timeline";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -640,6 +644,7 @@ export function TabelaLogs() {
   const [filteredData, setFilteredData] = React.useState<LogData[]>([]);
   const [selectedLog, setSelectedLog] = React.useState<LogData | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<'table' | 'timeline'>('table');
   const [dateFilters, setDateFilters] = React.useState<DateFilters>({
     startDate: '',
     endDate: '',
@@ -958,6 +963,27 @@ export function TabelaLogs() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-secondary/50 rounded-lg p-1">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="gap-1.5 h-8"
+                >
+                  <LayoutList className="h-4 w-4" />
+                  <span className="hidden sm:inline">Tabela</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'timeline' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('timeline')}
+                  className="gap-1.5 h-8"
+                >
+                  <GitCommitHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Timeline</span>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -988,110 +1014,135 @@ export function TabelaLogs() {
         </CardContent>
       </Card>
 
-      {/* Table - Design premium */}
-      <Card className="border-border/50 overflow-hidden shadow-sm bg-card/50 backdrop-blur-sm">
-        {/* Header da tabela */}
-        <div className="px-5 py-4 border-b border-border/50 bg-gradient-to-r from-secondary/30 to-transparent">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileText className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Registros de Log</h3>
-                <p className="text-xs text-muted-foreground">
-                  {totalRows.toLocaleString('pt-BR')} registro{totalRows !== 1 ? 's' : ''} encontrado{totalRows !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-secondary/20 hover:bg-secondary/20 border-b border-border/50">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="font-semibold text-foreground/70 h-12 text-xs uppercase tracking-wide">
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row, index) => (
-                <TableRow 
-                  key={row.id} 
-                  className={`transition-all duration-200 hover:bg-primary/5 hover:shadow-sm border-b border-border/30 ${index % 2 === 0 ? 'bg-card/50' : 'bg-secondary/5'}`}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-3">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-40 text-center">
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Search className="h-8 w-8 opacity-50" />
-                    <p>Nenhum resultado encontrado</p>
-                    <Button variant="outline" size="sm" onClick={clearAllFilters}>
-                      Limpar filtros
-                    </Button>
+      {/* Content Area */}
+      <AnimatePresence mode="wait">
+        {viewMode === 'timeline' ? (
+          <motion.div
+            key="timeline"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="border-border/50 overflow-hidden shadow-sm bg-card/50 backdrop-blur-sm p-6">
+              <LogTimeline data={filteredData} onViewDetails={openLogDetails} />
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="table"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Table - Design premium */}
+            <Card className="border-border/50 overflow-hidden shadow-sm bg-card/50 backdrop-blur-sm">
+              {/* Header da tabela */}
+              <div className="px-5 py-4 border-b border-border/50 bg-gradient-to-r from-secondary/30 to-transparent">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <FileText className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">Registros de Log</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {totalRows.toLocaleString('pt-BR')} registro{totalRows !== 1 ? 's' : ''} encontrado{totalRows !== 1 ? 's' : ''}
+                      </p>
+                    </div>
                   </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                </div>
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id} className="bg-secondary/20 hover:bg-secondary/20 border-b border-border/50">
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id} className="font-semibold text-foreground/70 h-12 text-xs uppercase tracking-wide">
+                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row, index) => (
+                      <TableRow 
+                        key={row.id} 
+                        className={`transition-all duration-200 hover:bg-primary/5 hover:shadow-sm border-b border-border/30 ${index % 2 === 0 ? 'bg-card/50' : 'bg-secondary/5'}`}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id} className="py-3">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={columns.length} className="h-40 text-center">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Search className="h-8 w-8 opacity-50" />
+                          <p>Nenhum resultado encontrado</p>
+                          <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                            Limpar filtros
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between px-4 py-4 border-t border-border bg-secondary/20">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>
-              {totalRows > 0 
-                ? `Mostrando ${(currentPage - 1) * table.getState().pagination.pageSize + 1} a ${Math.min(currentPage * table.getState().pagination.pageSize, totalRows)} de ${totalRows}`
-                : 'Nenhum registro'
-              }
-            </span>
-            <Select
-              value={String(table.getState().pagination.pageSize)}
-              onValueChange={(value) => table.setPageSize(Number(value))}
-            >
-              <SelectTrigger className="h-8 w-[70px] bg-background">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border border-border z-50">
-                {[10, 15, 20, 30, 50].map((size) => (
-                  <SelectItem key={size} value={String(size)}>{size}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {/* Pagination */}
+              <div className="flex items-center justify-between px-4 py-4 border-t border-border bg-secondary/20">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span>
+                    {totalRows > 0 
+                      ? `Mostrando ${(currentPage - 1) * table.getState().pagination.pageSize + 1} a ${Math.min(currentPage * table.getState().pagination.pageSize, totalRows)} de ${totalRows}`
+                      : 'Nenhum registro'
+                    }
+                  </span>
+                  <Select
+                    value={String(table.getState().pagination.pageSize)}
+                    onValueChange={(value) => table.setPageSize(Number(value))}
+                  >
+                    <SelectTrigger className="h-8 w-[70px] bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border border-border z-50">
+                      {[10, 15, 20, 30, 50].map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()}>
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-3 text-sm text-muted-foreground">
-              {currentPage} de {pageCount || 1}
-            </span>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.setPageIndex(pageCount - 1)} disabled={!table.getCanNextPage()}>
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </Card>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()}>
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="px-3 text-sm text-muted-foreground">
+                    {currentPage} de {pageCount || 1}
+                  </span>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.setPageIndex(pageCount - 1)} disabled={!table.getCanNextPage()}>
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modal */}
       <LogDetailsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} logData={selectedLog} />
