@@ -139,7 +139,12 @@ export function ClientsChart({ filters }: ClientsChartProps) {
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               Evolução de Clientes
             </CardTitle>
-            <CardDescription>Acompanhamento mensal da base de clientes</CardDescription>
+            <CardDescription className="flex items-center gap-2">
+              Acompanhamento mensal da base de clientes
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium">
+                Dados estimados
+              </span>
+            </CardDescription>
           </div>
           <div className="flex items-center gap-3">
             {!isLoading && (
@@ -167,11 +172,11 @@ export function ClientsChart({ filters }: ClientsChartProps) {
           <div className="bg-gradient-to-br from-success/10 to-success/5 rounded-xl p-4 border border-success/20">
             <p className="text-sm text-muted-foreground mb-1">Novos no Período</p>
             <p className="text-2xl font-bold text-success">
-              {isLoading ? "..." : novosTotal}
+              {isLoading ? "..." : `~${novosTotal}`}
             </p>
-            <div className="flex items-center gap-1 mt-1 text-xs text-success">
+            <div className="flex items-center gap-1 mt-1 text-xs text-warning">
               <ArrowUp className="w-3 h-3" />
-              <span>Estimativa mensal</span>
+              <span>Estimativa</span>
             </div>
           </div>
           <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl p-4 border border-accent/20">
