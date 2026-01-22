@@ -170,11 +170,12 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
         /integrado com sucesso/i,
       ];
 
-      // Padrões para omitir (CPF/CNPJ já cadastrado)
+      // Padrões para omitir (ruído)
       const omitPatterns = [
         /cpf\s*(já\s*)?cadastrado/i,
         /cnpj\s*(já\s*)?cadastrado/i,
         /documento\s*(já\s*)?cadastrado/i,
+        /resposta:\s*array/i,
       ];
 
       newLogs.forEach((log: any) => {
