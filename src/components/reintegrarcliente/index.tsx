@@ -2,6 +2,7 @@ import useIntegrador from "@/hooks/use-integrador";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/services/api";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { RefreshCw, Loader2 } from "lucide-react";
 import {
   AlertDialog,
@@ -63,55 +64,60 @@ export default function ReintegrarCliente({ nome }: any) {
     }
   }
 
+  // Renderizar o modal via portal para evitar conflitos com DropdownMenu
+  const modalContent = openModal ? createPortal(
+    <AlertDialog open={openModal} onOpenChange={setOpenModal}>
+      <AlertDialogContent className="sm:max-w-md">
+        <AlertDialogHeader>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <RefreshCw className="h-6 w-6 text-primary" />
+          </div>
+          <AlertDialogTitle className="text-center">
+            Reintegrar cliente?
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-center">
+            <span className="block mb-2">
+              Deseja reintegrar o cliente:
+            </span>
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg text-foreground font-medium text-sm">
+              {nome}
+            </span>
+            <span className="block mt-3 text-xs">
+              Esta ação irá sincronizar os dados do cliente com o sistema.
+            </span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
+          <AlertDialogCancel 
+            onClick={() => setOpenModal(false)}
+            className="sm:w-32"
+            disabled={loading}
+          >
+            Cancelar
+          </AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={Reintegra} 
+            disabled={loading}
+            className="sm:w-32"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Aguarde
+              </>
+            ) : (
+              "Reintegrar"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>,
+    document.body
+  ) : null;
+
   return (
     <>
-      {/* Modal de confirmação */}
-      <AlertDialog open={openModal} onOpenChange={setOpenModal}>
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <RefreshCw className="h-6 w-6 text-primary" />
-            </div>
-            <AlertDialogTitle className="text-center">
-              Reintegrar cliente?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-center">
-              <span className="block mb-2">
-                Deseja reintegrar o cliente:
-              </span>
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg text-foreground font-medium text-sm">
-                {nome}
-              </span>
-              <span className="block mt-3 text-xs">
-                Esta ação irá sincronizar os dados do cliente com o sistema.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
-            <AlertDialogCancel 
-              onClick={() => setOpenModal(false)}
-              className="sm:w-32"
-              disabled={loading}
-            >
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={Reintegra} 
-              disabled={loading}
-              className="sm:w-32"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Aguarde
-                </>
-              ) : (
-                "Reintegrar"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {modalContent}
 
       {/* Item do dropdown menu */}
       <button
