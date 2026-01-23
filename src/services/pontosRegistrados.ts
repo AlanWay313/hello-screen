@@ -10,6 +10,7 @@ interface Ponto {
 interface PontosResponse {
   retorno_status: boolean;
   pontos: Ponto[];
+  error?: string;
 }
 
 /**

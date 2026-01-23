@@ -2,9 +2,11 @@ import axios from 'axios';
 
 // Crie uma instância do Axios
 
+// https://webhooks.sysprov.com.br/ole/ frionline
+// https://hub.sysprov.com.br/integraoletv/ netcom
 
 const api = axios.create({
-  baseURL: 'https://webhooks.sysprov.com.br/ole/', 
+  baseURL: 'https://hub.sysprov.com.br/integraoletv/', 
                  
 });
 

@@ -109,9 +109,9 @@ export function PontosRegistrados({ idContrato }: PontosRegistradosProps) {
         ) : error ? (
           <div className="text-center py-8 text-muted-foreground">
             <WifiOff className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p>Não foi possível carregar os pontos.</p>
+            <p>Nenhum ponto registrado para este contrato.</p>
             <Button variant="ghost" size="sm" onClick={fetchPontos} className="mt-2">
-              Tentar novamente
+              Aguarde até que algum aparelho se conecte
             </Button>
           </div>
         ) : pontos.length === 0 ? (

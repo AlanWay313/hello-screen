@@ -2,13 +2,13 @@
   "name": "integraole",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "type": "module",  
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
-    "preview": "vite preview",
-    "lint": "eslint ."
+    "start": "serve dist -s -n -L -p $PORT",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.4",
