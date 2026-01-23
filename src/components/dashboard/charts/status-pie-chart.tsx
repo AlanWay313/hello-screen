@@ -38,8 +38,8 @@ export function StatusPieChart({ filters }: StatusPieChartProps) {
         let inativos = Number(clientesData?.nulos || 0)
         let cancelados = canceladosData?.length || 0
         
-        // Clientes ativos = total base - inativos - cancelados (mesma lógica do StatsOverview)
-        let ativos = Math.max(0, totalBase - inativos - cancelados)
+        // Clientes ativos = total base - cancelados (inativos são separados, vêm de "nulos")
+        let ativos = Math.max(0, totalBase - cancelados)
 
         // Aplicar filtro de status se existir
         if (filters?.status) {
@@ -70,10 +70,10 @@ export function StatusPieChart({ filters }: StatusPieChartProps) {
     fetchData()
   }, [integrador, filters])
 
-  // Total é apenas ativos + inativos (sem cancelados), alinhado com o Total de Clientes
+  // Total na base = ativos + cancelados (nao_nulos), alinhado com o card "Total de Clientes"
   const ativosValue = data.find(d => d.name === 'Ativos')?.value || 0
-  const inativosValue = data.find(d => d.name === 'Inativos')?.value || 0
-  const total = ativosValue + inativosValue
+  const canceladosValue = data.find(d => d.name === 'Cancelados')?.value || 0
+  const total = ativosValue + canceladosValue
 
   // Formatar números com separadores
   const formatNumber = (num: number) => num.toLocaleString('pt-BR')

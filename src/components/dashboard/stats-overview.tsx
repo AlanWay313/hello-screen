@@ -46,8 +46,8 @@ export function StatsOverview({ filters }: StatsOverviewProps) {
         let inativos = Number(clientesData?.nulos || 0)
         let cancelados = canceladosData?.length || 0
         
-        // Clientes ativos = total base - inativos - cancelados
-        let ativos = Math.max(0, totalBase - inativos - cancelados)
+        // Clientes ativos = total base - cancelados (inativos são separados, vêm de "nulos")
+        let ativos = Math.max(0, totalBase - cancelados)
         let total = totalBase
 
         // Aplicar filtro de status
