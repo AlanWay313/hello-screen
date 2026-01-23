@@ -903,7 +903,10 @@ export function TabelaLogs() {
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalRows = table.getFilteredRowModel().rows.length;
 
-  if (isLoading && !data) return <LogsPageSkeleton />;
+  // Mostrar skeleton enquanto estiver carregando OU até que os dados realmente existam
+  const showSkeleton = isLoading || (!data || (data.length === 0 && !isCached));
+  
+  if (showSkeleton && stats.total === 0) return <LogsPageSkeleton />;
 
   return (
     <div className="space-y-6">
