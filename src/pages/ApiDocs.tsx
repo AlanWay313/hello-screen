@@ -28,7 +28,10 @@ import { cn } from '@/lib/utils';
 import logoOletv from '@/assets/logo-oletv-new.png';
 import { ApiTester } from '@/components/api-tester';
 
-interface EndpointData {
+// Interface para os endpoints - preparada para futura integração com banco de dados
+// TODO: Futuramente, esses dados virão de uma tabela no Supabase
+export interface EndpointData {
+  id?: string; // ID para quando vier do banco
   method: 'GET' | 'POST';
   url: string;
   description: string;
@@ -37,6 +40,8 @@ interface EndpointData {
   postParams?: { name: string; type: string; description: string; required?: boolean }[];
   notes?: string[];
   response: string;
+  createdAt?: string; // Para quando vier do banco
+  updatedAt?: string; // Para quando vier do banco
 }
 
 interface EndpointProps extends Omit<EndpointData, 'section'> {
@@ -1053,6 +1058,24 @@ export function ApiDocs() {
                 </div>
               ))}
             </div>
+            
+            {/* Aviso de Bloqueio */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mt-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-red-500">⚠️ Atenção: Política de Segurança</p>
+                  <p className="text-sm text-muted-foreground">
+                    Caso os dados de autenticação sejam enviados <strong>incorretamente por 3 vezes consecutivas</strong>, 
+                    o acesso à API será <strong>bloqueado permanentemente</strong> para o IP/credencial utilizada.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Para desbloquear, entre em contato com o <strong>suporte da Olé</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-4">
               <p className="text-sm font-medium mb-2">Resposta de erro de autenticação:</p>
               <pre className="bg-muted/50 border border-border rounded-lg p-3 text-xs font-mono">

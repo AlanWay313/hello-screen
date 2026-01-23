@@ -139,7 +139,26 @@ export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
     return `${getActiveBaseUrl()}${path}`;
   };
 
+  // Validação dos campos de autenticação
+  const validateAuthFields = (): boolean => {
+    const keyapi = formValues['keyapi']?.trim();
+    const login = formValues['login']?.trim();
+    const pass = formValues['pass']?.trim();
+    
+    return !!(keyapi && login && pass);
+  };
+
   const handleTest = async () => {
+    // Verificar se os campos de autenticação estão preenchidos
+    if (!validateAuthFields()) {
+      setResponse(JSON.stringify({
+        error: "Campos de autenticação obrigatórios",
+        message: "Preencha os campos keyapi, login e pass antes de enviar a requisição."
+      }, null, 2));
+      setResponseStatus('error');
+      return;
+    }
+
     setIsLoading(true);
     setResponse(null);
     setResponseStatus(null);
