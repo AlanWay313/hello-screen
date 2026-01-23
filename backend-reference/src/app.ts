@@ -12,6 +12,7 @@ import { logger } from './lib/logger';
 import webhookRoutes from './routes/webhook.routes';
 import syncRoutes from './routes/sync.routes';
 import integrationRoutes from './routes/integration.routes';
+import syncFromOleRoutes from './routes/sync-from-ole.routes';
 
 // Criar aplicação
 const app = express();
@@ -76,6 +77,7 @@ app.get('/health', (req, res) => {
 app.use('/api/webhook', webhookRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/integration', integrationRoutes);
+app.use('/api/sync-from-ole', syncFromOleRoutes);
 
 // ==========================================
 // ERROR HANDLING

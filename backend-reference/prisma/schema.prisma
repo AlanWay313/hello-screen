@@ -246,3 +246,116 @@ model ExternalApiToken {
   
   @@map("external_api_tokens")
 }
+
+// ==========================================
+// DADOS SINCRONIZADOS DA OLÉ TV
+// ==========================================
+
+model OleCliente {
+  id              String   @id @default(uuid())
+  integrationId   String   @map("integration_id")
+  
+  // Identificador na API Olé
+  oleClienteId    String   @map("ole_cliente_id")
+  
+  // Dados do cliente
+  documento       String   // CPF/CNPJ
+  nome            String
+  email           String?
+  telefone        String?
+  
+  // Endereço
+  endereco        String?
+  numero          String?
+  complemento     String?
+  bairro          String?
+  cidade          String?
+  estado          String?
+  cep             String?
+  
+  // Status
+  status          String   @default("ATIVO")
+  
+  // Dados brutos da API (para auditoria)
+  rawData         Json?    @map("raw_data")
+  
+  // Sincronização
+  lastSyncAt      DateTime @map("last_sync_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamentos
+  contratos       OleContrato[]
+  boletos         OleBoleto[]
+  
+  @@unique([integrationId, oleClienteId])
+  @@index([documento])
+  @@index([status])
+  @@map("ole_clientes")
+}
+
+model OleContrato {
+  id              String   @id @default(uuid())
+  integrationId   String   @map("integration_id")
+  oleClienteId    String   @map("ole_cliente_local_id")
+  
+  // Identificador na API Olé
+  oleContratoId   String   @map("ole_contrato_id")
+  
+  // Dados do contrato
+  plano           String?
+  valor           Float?
+  dataInicio      DateTime? @map("data_inicio")
+  dataVencimento  DateTime? @map("data_vencimento")
+  diaVencimento   Int?     @map("dia_vencimento")
+  status          String   @default("ATIVO")
+  
+  // Dados brutos da API
+  rawData         Json?    @map("raw_data")
+  
+  // Sincronização
+  lastSyncAt      DateTime @map("last_sync_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamento
+  cliente         OleCliente @relation(fields: [oleClienteId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, oleContratoId])
+  @@index([status])
+  @@map("ole_contratos")
+}
+
+model OleBoleto {
+  id              String   @id @default(uuid())
+  integrationId   String   @map("integration_id")
+  oleClienteId    String   @map("ole_cliente_local_id")
+  
+  // Identificador na API Olé
+  oleBoletoId     String   @map("ole_boleto_id")
+  
+  // Dados do boleto
+  valor           Float    @default(0)
+  dataVencimento  DateTime? @map("data_vencimento")
+  dataPagamento   DateTime? @map("data_pagamento")
+  status          String   @default("PENDENTE")
+  linhaDigitavel  String?  @map("linha_digitavel")
+  codigoBarras    String?  @map("codigo_barras")
+  urlPdf          String?  @map("url_pdf")
+  
+  // Dados brutos da API
+  rawData         Json?    @map("raw_data")
+  
+  // Sincronização
+  lastSyncAt      DateTime @map("last_sync_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamento
+  cliente         OleCliente @relation(fields: [oleClienteId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, oleBoletoId])
+  @@index([status])
+  @@index([dataVencimento])
+  @@map("ole_boletos")
+}

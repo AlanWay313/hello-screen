@@ -305,6 +305,52 @@ export class OleApiService {
   async buscarBloqueiosContrato(idContrato: string): Promise<OleApiResponse> {
     return this.request('/buscarBloqueiosContrato.php', { idContrato });
   }
+
+  // ==========================================
+  // LISTAGEM COMPLETA (PARA SINCRONIZAÇÃO)
+  // ==========================================
+
+  /**
+   * Lista todos os clientes (para sync completo)
+   */
+  async listarTodosClientes(): Promise<OleApiResponse> {
+    return this.request('/listarTodosClientes.php', {});
+  }
+
+  /**
+   * Lista todos os boletos de um cliente por documento
+   */
+  async listarBoletos(documento: string): Promise<OleApiResponse> {
+    return this.request('/listarBoletos.php', { documento });
+  }
+
+  /**
+   * Lista todos os boletos por status
+   */
+  async listarBoletosPorStatus(status: 'pendente' | 'pago' | 'vencido'): Promise<OleApiResponse> {
+    return this.request('/listarBoletos.php', { status });
+  }
+
+  /**
+   * Testa conexão com a API (validação de credenciais)
+   */
+  async testarConexao(): Promise<OleApiResponse<{ valid: boolean }>> {
+    try {
+      const response = await this.listarTodosClientes();
+      return {
+        success: response.success,
+        data: { valid: response.success },
+        statusCode: response.statusCode,
+        error: response.error,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: { valid: false },
+        error: error instanceof Error ? error.message : 'Erro ao testar conexão',
+      };
+    }
+  }
 }
 
 export default OleApiService;
