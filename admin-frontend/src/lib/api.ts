@@ -24,31 +24,53 @@ export async function apiRequest<T>(
 }
 
 export const api = {
-  // Queue
-  getQueueStats: () => apiRequest<{ data: QueueStats }>('/queue/stats'),
-  getQueueItems: (status?: string) => 
-    apiRequest<{ data: { items: QueueItem[] } }>(`/queue/items${status ? `?status=${status}` : ''}`),
+  // Queue - Endpoints reais do backend
+  getQueueStats: () => apiRequest<QueueStatsResponse>('/queue/stats'),
+  getQueueItems: (status?: string) => {
+    const params = new URLSearchParams({ limit: '20' })
+    if (status) params.append('status', status)
+    return apiRequest<QueueItemsResponse>(`/queue/items?${params}`)
+  },
   retryQueueItem: (id: string) => 
     apiRequest<{ success: boolean }>(`/queue/retry/${id}`, { method: 'POST' }),
   deleteQueueItem: (id: string) => 
     apiRequest<{ success: boolean }>(`/queue/${id}`, { method: 'DELETE' }),
 
-  // Sync
-  getSyncStats: () => apiRequest<{ data: SyncStats }>('/sync-from-ole/stats'),
-  runFullSync: () => apiRequest<{ data: SyncResult }>('/sync-from-ole/full', { method: 'POST' }),
+  // Sync From Olé - Endpoints reais do backend
+  getSyncStats: () => apiRequest<SyncStatsResponse>('/sync-from-ole/stats'),
+  runFullSync: () => apiRequest<SyncResultResponse>('/sync-from-ole/full', { method: 'POST' }),
 
-  // Integration
+  // Integration - Endpoints reais do backend
   setupIntegration: (data: IntegrationSetup) => 
     apiRequest<SetupResponse>('/integration/setup', { 
       method: 'POST', 
       body: JSON.stringify(data) 
     }),
-  getIntegrationStatus: () => apiRequest<{ data: IntegrationStatus }>('/integration/status'),
+  getIntegrationStatus: () => apiRequest<IntegrationStatusResponse>('/integration/status'),
   regenerateToken: () => 
-    apiRequest<{ webhookToken: string }>('/integration/regenerate-token', { method: 'POST' }),
+    apiRequest<RegenerateTokenResponse>('/integration/regenerate-token', { method: 'POST' }),
 }
 
-// Types
+// ==========================================
+// TIPOS - Baseados nas respostas reais do backend
+// ==========================================
+
+// Queue Stats
+export interface QueueStatsResponse {
+  success: boolean
+  data: {
+    queue: {
+      pending: number
+      processing: number
+      success: number
+      failed: number
+      total: number
+    }
+    recentByAction: Array<{ action: string; count: number }>
+    lastUpdate: string
+  }
+}
+
 export interface QueueStats {
   pending: number
   processing: number
@@ -62,18 +84,44 @@ export interface QueueStats {
   }
 }
 
+// Queue Items
+export interface QueueItemsResponse {
+  success: boolean
+  data: {
+    items: QueueItem[]
+    pagination: {
+      total: number
+      limit: number
+      offset: number
+    }
+  }
+}
+
 export interface QueueItem {
   id: string
   action: string
   status: string
+  priority: number
   attempts: number
   maxAttempts: number
   lastError: string | null
+  scheduledFor: string | null
+  processedAt: string | null
   createdAt: string
-  updatedAt: string
-  payload: {
-    clientName?: string
-    document?: string
+  payload: any
+  documento?: string
+  nome?: string
+  localClientId?: string
+}
+
+// Sync Stats
+export interface SyncStatsResponse {
+  success: boolean
+  data: {
+    clientes: number
+    contratos: number
+    boletos: number
+    lastSync: string | null
   }
 }
 
@@ -84,18 +132,45 @@ export interface SyncStats {
   lastSync: string | null
 }
 
+// Sync Result
+export interface SyncResultResponse {
+  success: boolean
+  message: string
+  data: {
+    success: boolean
+    startedAt: string
+    completedAt: string
+    duration: number
+    totalSynced: number
+    totalFailed: number
+    results: {
+      clientes: EntitySyncResult
+      contratos: EntitySyncResult
+      boletos: EntitySyncResult
+    }
+  }
+}
+
+export interface EntitySyncResult {
+  synced: number
+  failed: number
+  errors: string[]
+  duration: number
+}
+
 export interface SyncResult {
   success: boolean
   totalSynced: number
   totalFailed: number
   duration: number
   results: {
-    clientes: { synced: number; failed: number; errors: string[] }
-    contratos: { synced: number; failed: number; errors: string[] }
-    boletos: { synced: number; failed: number; errors: string[] }
+    clientes: EntitySyncResult
+    contratos: EntitySyncResult
+    boletos: EntitySyncResult
   }
 }
 
+// Integration Setup
 export interface IntegrationSetup {
   oleKeyapi: string
   oleLogin: string
@@ -104,15 +179,67 @@ export interface IntegrationSetup {
 
 export interface SetupResponse {
   success: boolean
-  integration: { id: string; webhookToken: string }
-  webhookUrl: string
-  webhookHeaders: { Username: string; Password: string; Token: string }
-  authToken: string
+  message: string
+  data: {
+    integrationId: string
+    userId: string
+    webhookToken: string
+    authToken: string
+    webhookUrl: string
+    instructions: {
+      webhook: {
+        url: string
+        method: string
+        headers: {
+          'Content-Type': string
+          Username: string
+          Password: string
+          Token: string
+        }
+      }
+      api: {
+        authorization: string
+        note: string
+      }
+    }
+    isNew: boolean
+  }
 }
 
-export interface IntegrationStatus {
-  configured: boolean
-  isActive: boolean
-  webhookUrl: string
-  lastActivity: string | null
+// Integration Status
+export interface IntegrationStatusResponse {
+  success: boolean
+  data: {
+    integrationId: string
+    isActive: boolean
+    oleLogin: string
+    lastSync: string | null
+    createdAt: string
+    stats: {
+      clientesNoCache: number
+      itensNaFila: number
+      logsRegistrados: number
+      fila: {
+        pending: number
+        processing: number
+        success: number
+        failed: number
+      }
+    }
+    webhook: {
+      url: string
+      tokenConfigured: boolean
+    }
+  }
+}
+
+// Regenerate Token
+export interface RegenerateTokenResponse {
+  success: boolean
+  message: string
+  data: {
+    webhookToken: string
+    webhookUrl: string
+    note: string
+  }
 }

@@ -9,7 +9,7 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
-  Link
+  ExternalLink
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,9 +22,10 @@ import { useToast } from '@/hooks/use-toast'
 export function Settings() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [setupComplete, setSetupComplete] = useState(false)
-  const [result, setResult] = useState<SetupResponse | null>(null)
+  const [setupComplete, setSetupComplete] = useState(!!localStorage.getItem('admin_auth_token'))
+  const [result, setResult] = useState<SetupResponse['data'] | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [form, setForm] = useState({
     oleKeyapi: '',
@@ -43,10 +44,13 @@ export function Settings() {
     setLoading(true)
     try {
       const res = await api.setupIntegration(form)
-      setResult(res)
+      setResult(res.data)
       setSetupComplete(true)
-      localStorage.setItem('admin_auth_token', res.authToken)
-      toast({ title: 'Sucesso', description: 'Integração configurada!' })
+      localStorage.setItem('admin_auth_token', res.data.authToken)
+      toast({ 
+        title: res.data.isNew ? 'Integração criada!' : 'Integração já existe', 
+        description: 'Token de autenticação salvo' 
+      })
     } catch (err) {
       toast({ 
         title: 'Erro', 
@@ -58,12 +62,50 @@ export function Settings() {
     }
   }
 
+  const handleRegenerate = async () => {
+    setRegenerating(true)
+    try {
+      const res = await api.regenerateToken()
+      if (result) {
+        setResult({
+          ...result,
+          webhookToken: res.data.webhookToken,
+          webhookUrl: res.data.webhookUrl,
+        })
+      }
+      toast({ title: 'Sucesso', description: 'Token regenerado! Atualize no sistema externo.' })
+    } catch (err) {
+      toast({ 
+        title: 'Erro', 
+        description: err instanceof Error ? err.message : 'Falha ao regenerar', 
+        variant: 'destructive' 
+      })
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
     setCopied(label)
     setTimeout(() => setCopied(null), 2000)
-    toast({ title: 'Copiado!', description: `${label} copiado` })
+    toast({ title: 'Copiado!', description: `${label} copiado para a área de transferência` })
   }
+
+  const CopyButton = ({ text, label }: { text: string; label: string }) => (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8"
+      onClick={() => copyToClipboard(text, label)}
+    >
+      {copied === label ? (
+        <CheckCircle2 className="h-4 w-4 text-green-500" />
+      ) : (
+        <Copy className="h-4 w-4" />
+      )}
+    </Button>
+  )
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -155,7 +197,7 @@ export function Settings() {
               ) : (
                 <>
                   <Shield className="mr-2 h-4 w-4" />
-                  Configurar Integração
+                  {setupComplete ? 'Atualizar Configuração' : 'Configurar Integração'}
                 </>
               )}
             </Button>
@@ -164,7 +206,7 @@ export function Settings() {
       </Card>
 
       {/* Result */}
-      {setupComplete && result && (
+      {result && (
         <Card className="border-green-500/20 bg-green-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -174,46 +216,65 @@ export function Settings() {
             <CardDescription>Use estas informações no sistema externo</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Webhook URL */}
             <div className="space-y-2">
               <Label className="text-muted-foreground">Webhook URL</Label>
               <div className="flex items-center gap-2 p-3 rounded-lg bg-background border">
                 <code className="flex-1 text-sm font-mono truncate">{result.webhookUrl}</code>
+                <CopyButton text={result.webhookUrl} label="URL" />
+              </div>
+            </div>
+
+            {/* Token */}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Token do Webhook</Label>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-background border">
+                <code className="flex-1 text-sm font-mono truncate">
+                  {result.webhookToken.slice(0, 32)}...
+                </code>
+                <CopyButton text={result.webhookToken} label="Token" />
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => copyToClipboard(result.webhookUrl, 'URL')}
+                  className="h-8 w-8"
+                  onClick={handleRegenerate}
+                  disabled={regenerating}
                 >
-                  {copied === 'URL' ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                  <RefreshCw className={`h-4 w-4 ${regenerating ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
 
-            <div className="grid gap-2">
-              {['Username', 'Password', 'Token'].map((key) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-background border">
-                  <div>
-                    <span className="text-xs text-muted-foreground">{key}</span>
-                    <p className="font-mono text-sm">
-                      {key === 'Token' 
-                        ? `${result.webhookHeaders.Token.slice(0, 24)}...`
-                        : key === 'Password' 
-                          ? '••••••••'
-                          : result.webhookHeaders[key as keyof typeof result.webhookHeaders]
-                      }
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(
-                      result.webhookHeaders[key as keyof typeof result.webhookHeaders],
-                      key
-                    )}
-                  >
-                    {copied === key ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                  </Button>
-                </div>
-              ))}
+            {/* Auth Token */}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Token de Autenticação (API)</Label>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-background border">
+                <code className="flex-1 text-sm font-mono truncate">
+                  {result.authToken.slice(0, 40)}...
+                </code>
+                <CopyButton text={result.authToken} label="Auth Token" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Use no header Authorization: Bearer {'{token}'}
+              </p>
+            </div>
+
+            {/* Instructions */}
+            <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+              <p className="font-medium text-sm flex items-center gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Instruções para o Sistema Externo
+              </p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p><strong>URL:</strong> POST {result.webhookUrl}</p>
+                <p><strong>Headers obrigatórios:</strong></p>
+                <ul className="ml-4 list-disc">
+                  <li>Content-Type: application/json</li>
+                  <li>Username: (seu usuário)</li>
+                  <li>Password: (sua senha)</li>
+                  <li>Token: (token gerado acima)</li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>

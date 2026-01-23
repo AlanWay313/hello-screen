@@ -8,25 +8,34 @@ import {
   RotateCcw,
   Trash2,
   User,
-  FileText
+  FileText,
+  AlertTriangle
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { StatCard } from '@/components/stat-card'
-import { api, QueueStats, QueueItem } from '@/lib/api'
+import { api, QueueStatsResponse, QueueItem } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
 export function Queue() {
   const { toast } = useToast()
-  const [stats, setStats] = useState<QueueStats | null>(null)
+  const [stats, setStats] = useState<QueueStatsResponse['data'] | null>(null)
   const [items, setItems] = useState<QueueItem[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [notConfigured, setNotConfigured] = useState(false)
 
   const fetchData = useCallback(async (status?: string) => {
+    const token = localStorage.getItem('admin_auth_token')
+    if (!token) {
+      setNotConfigured(true)
+      setLoading(false)
+      return
+    }
+
     try {
       const [statsRes, itemsRes] = await Promise.all([
         api.getQueueStats(),
@@ -34,8 +43,10 @@ export function Queue() {
       ])
       setStats(statsRes.data)
       setItems(itemsRes.data.items)
-    } catch {
-      toast({ title: 'Erro', description: 'Falha ao carregar dados', variant: 'destructive' })
+      setNotConfigured(false)
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+      toast({ title: 'Erro', description: 'Falha ao carregar dados da fila', variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -82,6 +93,7 @@ export function Queue() {
       PROCESSING: { className: 'bg-purple-500/10 text-purple-600 border-purple-500/20', label: 'Processando' },
       SUCCESS: { className: 'bg-green-500/10 text-green-600 border-green-500/20', label: 'Sucesso' },
       FAILED: { className: 'bg-red-500/10 text-red-600 border-red-500/20', label: 'Falhou' },
+      CANCELLED: { className: 'bg-gray-500/10 text-gray-600 border-gray-500/20', label: 'Cancelado' },
     }
     const { className, label } = config[status] || { className: '', label: status }
     return <Badge variant="outline" className={className}>{label}</Badge>
@@ -95,6 +107,23 @@ export function Queue() {
       CANCEL_CONTRACT: { label: 'Cancelar Contrato', icon: FileText },
     }
     return map[action] || { label: action, icon: FileText }
+  }
+
+  if (notConfigured) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Fila de Sincronização</h1>
+          <p className="text-muted-foreground">Monitor de processamento em tempo real</p>
+        </div>
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="p-6 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <p className="text-amber-700">Configure a integração primeiro para visualizar a fila.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -115,7 +144,7 @@ export function Queue() {
         <div className="grid gap-4 md:grid-cols-4">
           <StatCard
             title="Pendentes"
-            value={stats.pending}
+            value={stats.queue.pending}
             icon={Clock}
             iconClassName="bg-blue-500/10 text-blue-600"
             onClick={() => handleFilter('PENDING')}
@@ -123,15 +152,15 @@ export function Queue() {
           />
           <StatCard
             title="Processando"
-            value={stats.processing}
-            icon={stats.processing > 0 ? Loader2 : Clock}
+            value={stats.queue.processing}
+            icon={stats.queue.processing > 0 ? Loader2 : Clock}
             iconClassName="bg-purple-500/10 text-purple-600"
             onClick={() => handleFilter('PROCESSING')}
             className={activeFilter === 'PROCESSING' ? 'ring-2 ring-purple-500' : ''}
           />
           <StatCard
             title="Sucesso"
-            value={stats.success}
+            value={stats.queue.success}
             icon={CheckCircle2}
             iconClassName="bg-green-500/10 text-green-600"
             onClick={() => handleFilter('SUCCESS')}
@@ -139,7 +168,7 @@ export function Queue() {
           />
           <StatCard
             title="Falhas"
-            value={stats.failed}
+            value={stats.queue.failed}
             icon={XCircle}
             iconClassName="bg-red-500/10 text-red-600"
             onClick={() => handleFilter('FAILED')}
@@ -166,7 +195,13 @@ export function Queue() {
           </div>
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {loading && items.length === 0 ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Clock className="h-12 w-12 mx-auto mb-4 opacity-20" />
               <p>Nenhum item na fila</p>
@@ -191,7 +226,7 @@ export function Queue() {
                           {getStatusBadge(item.status)}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {item.payload.clientName || item.payload.document || 'N/A'}
+                          {item.nome || item.documento || 'N/A'}
                           <span className="mx-2">•</span>
                           Tentativa {item.attempts}/{item.maxAttempts}
                         </p>
