@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import logoOletv from '@/assets/logo-oletv.png';
+import logoOletv from '@/assets/logo-oletv-new.png';
 
 interface EndpointData {
   method: 'GET' | 'POST';
