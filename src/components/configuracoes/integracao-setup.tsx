@@ -323,7 +323,7 @@ export function IntegracaoSetup() {
       </Card>
 
       {/* Setup Result */}
-      {setupComplete && setupResult && (
+      {setupComplete && setupResult && setupResult.webhookHeaders && (
         <Card className="border-green-500/20 bg-green-500/5">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -340,9 +340,11 @@ export function IntegracaoSetup() {
               <Label className="text-muted-foreground">Webhook URL</Label>
               <div className="flex items-center gap-2 p-3 rounded-lg bg-background border">
                 <code className="flex-1 text-sm font-mono break-all">
-                  {setupResult.webhookUrl}
+                  {setupResult.webhookUrl || "URL não disponível"}
                 </code>
-                <CopyButton text={setupResult.webhookUrl} label="Webhook URL" />
+                {setupResult.webhookUrl && (
+                  <CopyButton text={setupResult.webhookUrl} label="Webhook URL" />
+                )}
               </div>
             </div>
 
@@ -356,9 +358,11 @@ export function IntegracaoSetup() {
                 <div className="flex items-center justify-between p-3 rounded-lg bg-background border">
                   <div>
                     <span className="text-xs text-muted-foreground">Username</span>
-                    <p className="font-mono text-sm">{setupResult.webhookHeaders.Username}</p>
+                    <p className="font-mono text-sm">{setupResult.webhookHeaders.Username || "N/A"}</p>
                   </div>
-                  <CopyButton text={setupResult.webhookHeaders.Username} label="Username" />
+                  {setupResult.webhookHeaders.Username && (
+                    <CopyButton text={setupResult.webhookHeaders.Username} label="Username" />
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-lg bg-background border">
@@ -366,18 +370,24 @@ export function IntegracaoSetup() {
                     <span className="text-xs text-muted-foreground">Password</span>
                     <p className="font-mono text-sm">••••••••</p>
                   </div>
-                  <CopyButton text={setupResult.webhookHeaders.Password} label="Password" />
+                  {setupResult.webhookHeaders.Password && (
+                    <CopyButton text={setupResult.webhookHeaders.Password} label="Password" />
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-lg bg-background border">
                   <div className="flex-1 min-w-0">
                     <span className="text-xs text-muted-foreground">Token</span>
                     <p className="font-mono text-sm truncate">
-                      {setupResult.webhookHeaders.Token.substring(0, 32)}...
+                      {setupResult.webhookHeaders.Token 
+                        ? `${setupResult.webhookHeaders.Token.substring(0, 32)}...`
+                        : "N/A"}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <CopyButton text={setupResult.webhookHeaders.Token} label="Token" />
+                    {setupResult.webhookHeaders.Token && (
+                      <CopyButton text={setupResult.webhookHeaders.Token} label="Token" />
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
@@ -426,9 +436,13 @@ export function IntegracaoSetup() {
               <Label className="text-muted-foreground">Token de Autenticação (API Admin)</Label>
               <div className="flex items-center gap-2 p-3 rounded-lg bg-background border">
                 <code className="flex-1 text-sm font-mono truncate">
-                  {setupResult.authToken.substring(0, 40)}...
+                  {setupResult.authToken 
+                    ? `${setupResult.authToken.substring(0, 40)}...`
+                    : "Token não disponível"}
                 </code>
-                <CopyButton text={setupResult.authToken} label="Auth Token" />
+                {setupResult.authToken && (
+                  <CopyButton text={setupResult.authToken} label="Auth Token" />
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Use este token no header Authorization para acessar endpoints administrativos.
