@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -19,7 +19,8 @@ import {
   Search,
   X,
   Receipt,
-  FileSignature
+  FileSignature,
+  Menu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -159,16 +160,17 @@ const Endpoint = ({ method, url, description, urlParams, postParams, notes, resp
 };
 
 interface SectionProps {
+  id: string;
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
 }
 
-const Section = ({ title, icon, children }: SectionProps) => {
+const Section = ({ id, title, icon, children }: SectionProps) => {
   const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <div className="space-y-4">
+    <div id={id} className="space-y-4 scroll-mt-24">
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-3 w-full text-left group"
@@ -184,8 +186,45 @@ const Section = ({ title, icon, children }: SectionProps) => {
   );
 };
 
+// Navigation sections config
+const navSections = [
+  { id: 'introducao', title: 'Introdução', icon: Book },
+  { id: 'autenticacao', title: 'Autenticação', icon: Shield },
+  { id: 'clientes', title: 'Clientes', icon: Users },
+  { id: 'boletos', title: 'Boletos', icon: Receipt },
+  { id: 'contratos', title: 'Contratos', icon: FileSignature },
+];
+
 export function ApiDocs() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeSection, setActiveSection] = useState('introducao');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Track active section on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const sections = navSections.map(s => document.getElementById(s.id));
+      const scrollPosition = window.scrollY + 150;
+
+      for (let i = sections.length - 1; i >= 0; i--) {
+        const section = sections[i];
+        if (section && section.offsetTop <= scrollPosition) {
+          setActiveSection(navSections[i].id);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
   
   const authParams = [
     { name: 'keyapi', type: 'string', description: 'Chave de acesso para validar o acesso', required: true },
@@ -854,7 +893,61 @@ export function ApiDocs() {
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8 max-w-5xl">
+      <div className="flex">
+        {/* Sidebar Navigation */}
+        <aside className={cn(
+          "hidden lg:block sticky top-20 h-[calc(100vh-5rem)] transition-all duration-300",
+          sidebarOpen ? "w-64" : "w-0 overflow-hidden"
+        )}>
+          <div className="p-4 space-y-2">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Navegação
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            {navSections.map((section) => {
+              const Icon = section.icon;
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left",
+                    activeSection === section.id
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{section.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Toggle sidebar button when closed */}
+        {!sidebarOpen && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden lg:flex fixed left-4 top-24 z-40 gap-2"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-4 w-4" />
+            Menu
+          </Button>
+        )}
+
+        <main className="flex-1 container mx-auto px-6 py-8 max-w-5xl">
         {/* Search Results */}
         {isSearching && (
           <div className="mb-8">
@@ -898,7 +991,7 @@ export function ApiDocs() {
         )}
 
         {/* Introdução */}
-        <Card className="mb-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+        <Card id="introducao" className="mb-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 scroll-mt-24">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Book className="h-5 w-5" />
@@ -919,7 +1012,7 @@ export function ApiDocs() {
         </Card>
 
         {/* Autenticação */}
-        <Card className="mb-8 bg-amber-500/5 border-amber-500/20">
+        <Card id="autenticacao" className="mb-8 bg-amber-500/5 border-amber-500/20 scroll-mt-24">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-amber-500">
               <Shield className="h-5 w-5" />
@@ -982,7 +1075,7 @@ export function ApiDocs() {
 
         {/* Endpoints */}
         <div className="space-y-8">
-          <Section title="Clientes" icon={<Users className="h-5 w-5" />}>
+          <Section id="clientes" title="Clientes" icon={<Users className="h-5 w-5" />}>
             <Endpoint
               method="POST"
               url="https://api.oletv.net.br/clientes/listar"
@@ -1123,7 +1216,7 @@ export function ApiDocs() {
             />
           </Section>
 
-          <Section title="Boletos" icon={<Receipt className="h-5 w-5" />}>
+          <Section id="boletos" title="Boletos" icon={<Receipt className="h-5 w-5" />}>
             <Endpoint
               method="POST"
               url="https://api.oletv.net.br/boletos/listar/{id_cliente}"
@@ -1297,7 +1390,7 @@ export function ApiDocs() {
             />
           </Section>
 
-          <Section title="Contratos / Assinatura" icon={<FileSignature className="h-5 w-5" />}>
+          <Section id="contratos" title="Contratos / Assinatura" icon={<FileSignature className="h-5 w-5" />}>
             <Endpoint
               method="POST"
               url="https://api.oletv.net.br/planos"
@@ -1566,6 +1659,7 @@ export function ApiDocs() {
           <p>Documentação API OleTV - Uso interno</p>
         </div>
       </main>
+      </div>
     </div>
   );
 }
