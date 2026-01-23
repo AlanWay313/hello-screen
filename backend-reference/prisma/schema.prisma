@@ -317,6 +317,7 @@ model OleCliente {
 // ----------------
 // CONTRATO OLÉTV
 // Endpoint: POST /contratos/listar/{id_cliente}
+// Relacionamento: Cliente → Contrato → Assinaturas → Equipamentos
 // ----------------
 model OleContrato {
   id              String   @id @default(uuid())
@@ -334,11 +335,7 @@ model OleContrato {
   dataAtivacao    String?  @map("data_ativacao")  // dd/mm/aaaa
   status          String   @default("Ativo")      // "Ativo (Sem Pendências)", etc
   
-  // Assinaturas - Array completo (JSON complexo)
-  // Cada assinatura: { id, plano, box, dispositivos, status_assinatura, equipamentos[] }
-  assinaturas     Json?    // Array de objetos assinatura
-  
-  // Dados brutos da API
+  // Dados brutos da API (backup)
   rawData         Json?    @map("raw_data")
   
   // Sincronização
@@ -346,13 +343,86 @@ model OleContrato {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
   
-  // Relacionamento
+  // Relacionamentos
   cliente         OleCliente @relation(fields: [oleClienteId], references: [id], onDelete: Cascade)
+  assinaturas     OleAssinatura[]
   
   @@unique([integrationId, oleId])
   @@index([status])
   @@map("ole_contratos")
 }
+
+// ----------------
+// ASSINATURA OLÉTV
+// Pertence a um Contrato
+// ----------------
+model OleAssinatura {
+  id              String   @id @default(uuid())
+  integrationId   String   @map("integration_id")
+  oleContratoId   String   @map("ole_contrato_local_id")
+  
+  // ID na API Olé (campo "id" da assinatura)
+  oleId           String   @map("ole_id")
+  
+  // Dados da assinatura - conforme /contratos/listar/{id}
+  plano           String?  // "Plano A"
+  box             String?  // "9" - quantidade de boxes
+  dispositivos    String?  // "9" - quantidade de dispositivos
+  statusAssinatura String? @map("status_assinatura")  // "Ativo"
+  
+  // Dados brutos (backup)
+  rawData         Json?    @map("raw_data")
+  
+  // Sincronização
+  lastSyncAt      DateTime @map("last_sync_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamentos
+  contrato        OleContrato @relation(fields: [oleContratoId], references: [id], onDelete: Cascade)
+  equipamentos    OleEquipamentoContrato[]
+  
+  @@unique([integrationId, oleId])
+  @@index([statusAssinatura])
+  @@map("ole_assinaturas")
+}
+
+// ----------------
+// EQUIPAMENTO DO CONTRATO OLÉTV
+// Pertence a uma Assinatura
+// (Diferente de OleEquipamento que é a lista de modelos disponíveis)
+// ----------------
+model OleEquipamentoContrato {
+  id                String   @id @default(uuid())
+  integrationId     String   @map("integration_id")
+  oleAssinaturaId   String   @map("ole_assinatura_local_id")
+  
+  // ID na API Olé (campo "id" do equipamento)
+  oleId             String   @map("ole_id")
+  
+  // Dados do equipamento - conforme /contratos/listar/{id}
+  equipamento       String?  // "Nome Equipamento" - modelo do aparelho
+  mac               String?  // "MAC do Equipamento"
+  dataInicio        String?  @map("data_inicio")  // dd/mm/aaaa
+  statusEquipamento String?  @map("status_equipamento")  // "Ativo"
+  
+  // Dados brutos (backup)
+  rawData           Json?    @map("raw_data")
+  
+  // Sincronização
+  lastSyncAt        DateTime @map("last_sync_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamento
+  assinatura        OleAssinatura @relation(fields: [oleAssinaturaId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, oleId])
+  @@index([mac])
+  @@index([statusEquipamento])
+  @@map("ole_equipamentos_contrato")
+}
+
 
 // ----------------
 // BOLETO OLÉTV

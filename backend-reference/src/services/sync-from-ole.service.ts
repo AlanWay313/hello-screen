@@ -42,6 +42,9 @@ interface SyncResult {
   failed: number;
   errors: string[];
   duration: number;
+  // Contadores extras para relacionamentos
+  assinaturas?: number;
+  equipamentos?: number;
 }
 
 interface FullSyncResult {
@@ -296,9 +299,11 @@ export class SyncFromOleService {
       failed: 0,
       errors: [],
       duration: 0,
+      assinaturas: 0,
+      equipamentos: 0,
     };
 
-    logger.syncStart('Contratos');
+    logger.syncStart('Contratos + Assinaturas + Equipamentos');
 
     try {
       const clientesLocais = await prisma.oleCliente.findMany({
@@ -322,13 +327,26 @@ export class SyncFromOleService {
               const contratos = response.data.contratos || [];
 
               if (contratos.length > 0) {
-                logger.clientSync(cliente.oleClienteId, cliente.nome || 'N/A', `${contratos.length} contrato(s)`);
-              }
+                let totalAssinaturas = 0;
+                let totalEquipamentos = 0;
 
-              for (const contrato of contratos) {
-                await this.upsertContrato(cliente.id, contrato);
-                result.synced++;
-                await this.delay(50);
+                for (const contrato of contratos) {
+                  const counts = await this.upsertContrato(cliente.id, contrato);
+                  result.synced++;
+                  result.assinaturas! += counts.assinaturas;
+                  result.equipamentos! += counts.equipamentos;
+                  totalAssinaturas += counts.assinaturas;
+                  totalEquipamentos += counts.equipamentos;
+                  await this.delay(50);
+                }
+
+                logger.clientSync(
+                  cliente.oleClienteId, 
+                  cliente.nome || 'N/A', 
+                  `${contratos.length} contrato(s), ${totalAssinaturas} assinatura(s), ${totalEquipamentos} equipamento(s)`
+                );
+              } else {
+                logger.syncSkip(`Cliente ${cliente.oleClienteId}`, 'sem contratos');
               }
             } else {
               logger.syncSkip(`Cliente ${cliente.oleClienteId}`, 'sem contratos');
@@ -344,6 +362,7 @@ export class SyncFromOleService {
         'contratos'
       );
 
+      logger.info(`   📊 Assinaturas: ${result.assinaturas} | Equipamentos: ${result.equipamentos}`);
       logger.syncComplete('Contratos', result.synced, result.failed, Date.now() - startTime);
 
     } catch (error) {
@@ -357,20 +376,29 @@ export class SyncFromOleService {
     return result;
   }
 
-  private async upsertContrato(oleClienteLocalId: string, oleContrato: any): Promise<void> {
-    const contratoId = String(oleContrato.id);
+  /**
+   * Insere ou atualiza um contrato e seus relacionamentos:
+   * Contrato → Assinaturas → Equipamentos
+   */
+  private async upsertContrato(oleClienteLocalId: string, oleContrato: any): Promise<{ assinaturas: number; equipamentos: number }> {
+    const contratoOleId = String(oleContrato.id);
+    let totalAssinaturas = 0;
+    let totalEquipamentos = 0;
 
-    await prisma.oleContrato.upsert({
+    // 1. Upsert do Contrato
+    const contrato = await prisma.oleContrato.upsert({
       where: {
-        integrationId_oleContratoId: {
+        integrationId_oleId: {
           integrationId: this.integrationId,
-          oleContratoId: contratoId,
+          oleId: contratoOleId,
         },
       },
       update: {
-        plano: oleContrato.tipo || oleContrato.servico || null,
         codigo: oleContrato.codigo || null,
-        dataInicio: oleContrato.data_ativacao ? this.parseDataBR(oleContrato.data_ativacao) : null,
+        tipo: oleContrato.tipo || null,
+        servico: oleContrato.servico || null,
+        dataGeracao: oleContrato.data_geracao || null,
+        dataAtivacao: oleContrato.data_ativacao || null,
         status: oleContrato.status || 'Ativo',
         rawData: oleContrato,
         lastSyncAt: new Date(),
@@ -378,15 +406,93 @@ export class SyncFromOleService {
       create: {
         integrationId: this.integrationId,
         oleClienteId: oleClienteLocalId,
-        oleContratoId: contratoId,
-        plano: oleContrato.tipo || oleContrato.servico || null,
+        oleId: contratoOleId,
         codigo: oleContrato.codigo || null,
-        dataInicio: oleContrato.data_ativacao ? this.parseDataBR(oleContrato.data_ativacao) : null,
+        tipo: oleContrato.tipo || null,
+        servico: oleContrato.servico || null,
+        dataGeracao: oleContrato.data_geracao || null,
+        dataAtivacao: oleContrato.data_ativacao || null,
         status: oleContrato.status || 'Ativo',
         rawData: oleContrato,
         lastSyncAt: new Date(),
       },
     });
+
+    // 2. Processar Assinaturas do contrato
+    const assinaturas = oleContrato.assinaturas || [];
+    
+    for (const assinatura of assinaturas) {
+      const assinaturaOleId = String(assinatura.id);
+
+      const assinaturaLocal = await prisma.oleAssinatura.upsert({
+        where: {
+          integrationId_oleId: {
+            integrationId: this.integrationId,
+            oleId: assinaturaOleId,
+          },
+        },
+        update: {
+          plano: assinatura.plano || null,
+          box: assinatura.box || null,
+          dispositivos: assinatura.dispositivos || null,
+          statusAssinatura: assinatura.status_assinatura || null,
+          rawData: assinatura,
+          lastSyncAt: new Date(),
+        },
+        create: {
+          integrationId: this.integrationId,
+          oleContratoId: contrato.id,
+          oleId: assinaturaOleId,
+          plano: assinatura.plano || null,
+          box: assinatura.box || null,
+          dispositivos: assinatura.dispositivos || null,
+          statusAssinatura: assinatura.status_assinatura || null,
+          rawData: assinatura,
+          lastSyncAt: new Date(),
+        },
+      });
+
+      totalAssinaturas++;
+
+      // 3. Processar Equipamentos da assinatura
+      const equipamentos = assinatura.equipamentos || [];
+      
+      for (const equipamento of equipamentos) {
+        const equipamentoOleId = String(equipamento.id);
+
+        await prisma.oleEquipamentoContrato.upsert({
+          where: {
+            integrationId_oleId: {
+              integrationId: this.integrationId,
+              oleId: equipamentoOleId,
+            },
+          },
+          update: {
+            equipamento: equipamento.equipamento || null,
+            mac: equipamento.mac || null,
+            dataInicio: equipamento.data_inicio || null,
+            statusEquipamento: equipamento.status_equipamento || null,
+            rawData: equipamento,
+            lastSyncAt: new Date(),
+          },
+          create: {
+            integrationId: this.integrationId,
+            oleAssinaturaId: assinaturaLocal.id,
+            oleId: equipamentoOleId,
+            equipamento: equipamento.equipamento || null,
+            mac: equipamento.mac || null,
+            dataInicio: equipamento.data_inicio || null,
+            statusEquipamento: equipamento.status_equipamento || null,
+            rawData: equipamento,
+            lastSyncAt: new Date(),
+          },
+        });
+
+        totalEquipamentos++;
+      }
+    }
+
+    return { assinaturas: totalAssinaturas, equipamentos: totalEquipamentos };
   }
 
   // ==========================================
@@ -582,12 +688,16 @@ export class SyncFromOleService {
   async getLocalStats(): Promise<{
     clientes: number;
     contratos: number;
+    assinaturas: number;
+    equipamentos: number;
     boletos: number;
     lastSync: Date | null;
   }> {
-    const [clientes, contratos, boletos, integration] = await Promise.all([
+    const [clientes, contratos, assinaturas, equipamentos, boletos, integration] = await Promise.all([
       prisma.oleCliente.count({ where: { integrationId: this.integrationId } }),
       prisma.oleContrato.count({ where: { integrationId: this.integrationId } }),
+      prisma.oleAssinatura.count({ where: { integrationId: this.integrationId } }),
+      prisma.oleEquipamentoContrato.count({ where: { integrationId: this.integrationId } }),
       prisma.oleBoleto.count({ where: { integrationId: this.integrationId } }),
       prisma.integration.findUnique({
         where: { id: this.integrationId },
@@ -598,6 +708,8 @@ export class SyncFromOleService {
     return {
       clientes,
       contratos,
+      assinaturas,
+      equipamentos,
       boletos,
       lastSync: integration?.lastSync || null,
     };
