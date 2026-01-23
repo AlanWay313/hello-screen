@@ -34,9 +34,12 @@ export function StatusPieChart({ filters }: StatusPieChartProps) {
           ClientesCanceladosApi(integrador),
         ])
 
-        let ativos = Number(clientesData?.nao_nulos || 0)
+        const totalBase = Number(clientesData?.nao_nulos || 0)
         let inativos = Number(clientesData?.nulos || 0)
         let cancelados = canceladosData?.length || 0
+        
+        // Clientes ativos = total base - inativos - cancelados (mesma lógica do StatsOverview)
+        let ativos = Math.max(0, totalBase - inativos - cancelados)
 
         // Aplicar filtro de status se existir
         if (filters?.status) {
