@@ -14,30 +14,44 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { StatCard } from '@/components/stat-card'
-import { api, QueueStats, SyncStats } from '@/lib/api'
+import { api, QueueStatsResponse, SyncStatsResponse, IntegrationStatusResponse } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-type ConnectionStatus = 'checking' | 'connected' | 'disconnected'
+type ConnectionStatus = 'checking' | 'connected' | 'disconnected' | 'not_configured'
 
 export function Dashboard() {
-  const [queueStats, setQueueStats] = useState<QueueStats | null>(null)
-  const [syncStats, setSyncStats] = useState<SyncStats | null>(null)
+  const [queueStats, setQueueStats] = useState<QueueStatsResponse['data'] | null>(null)
+  const [syncStats, setSyncStats] = useState<SyncStatsResponse['data'] | null>(null)
+  const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse['data'] | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('checking')
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
+    
+    // Primeiro verifica se tem token
+    const token = localStorage.getItem('admin_auth_token')
+    if (!token) {
+      setConnectionStatus('not_configured')
+      setLoading(false)
+      return
+    }
+
     try {
-      const [queueRes, syncRes] = await Promise.all([
+      const [queueRes, syncRes, statusRes] = await Promise.all([
         api.getQueueStats(),
         api.getSyncStats(),
+        api.getIntegrationStatus(),
       ])
+      
       setQueueStats(queueRes.data)
       setSyncStats(syncRes.data)
+      setIntegrationStatus(statusRes.data)
       setConnectionStatus('connected')
       setLastUpdate(new Date())
-    } catch {
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error)
       setConnectionStatus('disconnected')
     } finally {
       setLoading(false)
@@ -53,27 +67,17 @@ export function Dashboard() {
   const getHealthStatus = () => {
     if (!queueStats) return { label: 'Desconhecido', color: 'text-muted-foreground', bg: 'bg-muted' }
     
-    if (queueStats.failed > 5) {
+    const { queue } = queueStats
+    if (queue.failed > 5) {
       return { label: 'Atenção', color: 'text-amber-600', bg: 'bg-amber-500/10' }
     }
-    if (queueStats.processing > 0 || queueStats.pending === 0) {
+    if (queue.processing > 0 || queue.pending === 0) {
       return { label: 'Saudável', color: 'text-green-600', bg: 'bg-green-500/10' }
     }
     return { label: 'Ocioso', color: 'text-muted-foreground', bg: 'bg-muted' }
   }
 
   const health = getHealthStatus()
-
-  const formatTimeAgo = (dateString: string | null) => {
-    if (!dateString) return 'Nunca'
-    const diff = Date.now() - new Date(dateString).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'Agora'
-    if (mins < 60) return `${mins}min atrás`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}h atrás`
-    return `${Math.floor(hours / 24)}d atrás`
-  }
 
   return (
     <div className="space-y-8">
@@ -90,6 +94,7 @@ export function Dashboard() {
               "gap-1.5 py-1.5",
               connectionStatus === 'connected' && "border-green-500/30 bg-green-500/10 text-green-600",
               connectionStatus === 'disconnected' && "border-red-500/30 bg-red-500/10 text-red-600",
+              connectionStatus === 'not_configured' && "border-amber-500/30 bg-amber-500/10 text-amber-600",
               connectionStatus === 'checking' && "border-muted"
             )}
           >
@@ -97,10 +102,12 @@ export function Dashboard() {
               "h-2 w-2 rounded-full",
               connectionStatus === 'connected' && "bg-green-500 animate-pulse",
               connectionStatus === 'disconnected' && "bg-red-500",
+              connectionStatus === 'not_configured' && "bg-amber-500",
               connectionStatus === 'checking' && "bg-muted-foreground"
             )} />
             {connectionStatus === 'connected' && 'Conectado'}
             {connectionStatus === 'disconnected' && 'Desconectado'}
+            {connectionStatus === 'not_configured' && 'Não Configurado'}
             {connectionStatus === 'checking' && 'Verificando...'}
           </Badge>
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
@@ -108,6 +115,21 @@ export function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Not Configured Warning */}
+      {connectionStatus === 'not_configured' && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <div>
+              <p className="font-medium text-amber-700">Integração não configurada</p>
+              <p className="text-sm text-muted-foreground">
+                Vá para <strong>Configurações</strong> e insira suas credenciais da Olé TV
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Connection Error */}
       {connectionStatus === 'disconnected' && (
@@ -139,25 +161,25 @@ export function Dashboard() {
           <div className="grid gap-4 md:grid-cols-4">
             <StatCard
               title="Pendentes"
-              value={queueStats.pending}
+              value={queueStats.queue.pending}
               icon={Clock}
               iconClassName="bg-blue-500/10 text-blue-600"
             />
             <StatCard
               title="Processando"
-              value={queueStats.processing}
-              icon={queueStats.processing > 0 ? Loader2 : Activity}
+              value={queueStats.queue.processing}
+              icon={queueStats.queue.processing > 0 ? Loader2 : Activity}
               iconClassName="bg-purple-500/10 text-purple-600"
             />
             <StatCard
               title="Sucesso"
-              value={queueStats.success}
+              value={queueStats.queue.success}
               icon={CheckCircle2}
               iconClassName="bg-green-500/10 text-green-600"
             />
             <StatCard
               title="Falhas"
-              value={queueStats.failed}
+              value={queueStats.queue.failed}
               icon={XCircle}
               iconClassName="bg-red-500/10 text-red-600"
             />
@@ -179,24 +201,24 @@ export function Dashboard() {
                     {health.label}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Último processamento: {formatTimeAgo(queueStats.recentActivity.lastProcessed)}
+                    Total na fila: {queueStats.queue.total} itens
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="p-3 rounded-lg bg-green-500/10">
-                    <p className="text-muted-foreground">Último sucesso</p>
-                    <p className="font-medium text-green-600">
-                      {formatTimeAgo(queueStats.recentActivity.lastSuccess)}
-                    </p>
+                {/* Recent Actions */}
+                {queueStats.recentByAction.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Ações recentes (24h)</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {queueStats.recentByAction.map((item) => (
+                        <div key={item.action} className="p-2 rounded bg-muted/50 text-sm">
+                          <p className="font-medium">{item.count}</p>
+                          <p className="text-xs text-muted-foreground">{item.action}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="p-3 rounded-lg bg-red-500/10">
-                    <p className="text-muted-foreground">Última falha</p>
-                    <p className="font-medium text-red-600">
-                      {formatTimeAgo(queueStats.recentActivity.lastFailed)}
-                    </p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -241,6 +263,33 @@ export function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Integration Info */}
+          {integrationStatus && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Informações da Integração</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Login Olé TV</p>
+                    <p className="font-medium">{integrationStatus.oleLogin}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <Badge variant={integrationStatus.isActive ? "default" : "secondary"}>
+                      {integrationStatus.isActive ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Clientes no Cache</p>
+                    <p className="font-medium">{integrationStatus.stats.clientesNoCache}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 

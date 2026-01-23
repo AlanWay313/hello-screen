@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { api, SyncStats, SyncResult } from '@/lib/api'
+import { api, SyncStatsResponse, SyncResultResponse } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
@@ -23,19 +23,28 @@ type SyncStep = 'idle' | 'clientes' | 'contratos' | 'boletos' | 'done' | 'error'
 
 export function Sync() {
   const { toast } = useToast()
-  const [stats, setStats] = useState<SyncStats | null>(null)
+  const [stats, setStats] = useState<SyncStatsResponse['data'] | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentStep, setCurrentStep] = useState<SyncStep>('idle')
-  const [result, setResult] = useState<SyncResult | null>(null)
+  const [result, setResult] = useState<SyncResultResponse['data'] | null>(null)
+  const [notConfigured, setNotConfigured] = useState(false)
 
   const fetchStats = async () => {
+    const token = localStorage.getItem('admin_auth_token')
+    if (!token) {
+      setNotConfigured(true)
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await api.getSyncStats()
       setStats(res.data)
-    } catch {
-      // Silently fail
+      setNotConfigured(false)
+    } catch (error) {
+      console.error('Erro ao buscar stats:', error)
     } finally {
       setLoading(false)
     }
@@ -146,6 +155,23 @@ export function Sync() {
     )
   }
 
+  if (notConfigured) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Sincronização</h1>
+          <p className="text-muted-foreground">Importar dados da API Olé TV para o banco local</p>
+        </div>
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="p-6 flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600" />
+            <p className="text-amber-700">Configure a integração primeiro para sincronizar dados.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -212,7 +238,7 @@ export function Sync() {
           ) : (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <AlertCircle className="h-5 w-5 text-amber-600" />
-              <p className="text-sm text-amber-700">Configure a integração nas Configurações primeiro</p>
+              <p className="text-sm text-amber-700">Erro ao carregar estatísticas</p>
             </div>
           )}
         </CardContent>
