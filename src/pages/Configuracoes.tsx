@@ -1,7 +1,8 @@
 import { TitlePage } from "@/components/title";
 import { IntegracaoSetup } from "@/components/configuracoes/integracao-setup";
+import { SyncFromOle } from "@/components/configuracoes/sync-from-ole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Webhook, Server } from "lucide-react";
+import { Settings, Webhook, Server, RefreshCw } from "lucide-react";
 
 export function Configuracoes() {
   return (
@@ -13,6 +14,10 @@ export function Configuracoes() {
           <TabsTrigger value="integracao" className="gap-2">
             <Webhook className="h-4 w-4" />
             Integração
+          </TabsTrigger>
+          <TabsTrigger value="sincronizacao" className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Sincronização
           </TabsTrigger>
           <TabsTrigger value="sistema" className="gap-2">
             <Server className="h-4 w-4" />
@@ -26,6 +31,10 @@ export function Configuracoes() {
 
         <TabsContent value="integracao" className="mt-6">
           <IntegracaoSetup />
+        </TabsContent>
+
+        <TabsContent value="sincronizacao" className="mt-6">
+          <SyncFromOle />
         </TabsContent>
 
         <TabsContent value="sistema" className="mt-6">
