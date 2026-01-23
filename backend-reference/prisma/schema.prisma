@@ -173,6 +173,7 @@ model ClientCache {
   // Validação e erros
   validationErrors Json?       @map("validation_errors")
   lastSyncError    String?     @map("last_sync_error") @db.Text
+  lastSyncAt       DateTime?   @map("last_sync_at")
   
   // Status
   status          ClientStatus @default(PENDING_VALIDATION)
@@ -534,4 +535,38 @@ model OleEquipamento {
   
   @@unique([integrationId, oleId])
   @@map("ole_equipamentos")
+}
+
+// ==========================================
+// MAPEAMENTO DE PRODUTOS (IntegrationCode → Plano Olé)
+// ==========================================
+
+model ProductPlanMapping {
+  id              String   @id @default(uuid())
+  integrationId   String   @map("integration_id")
+  
+  // Código de integração (vem do webhook Services[].IntegrationCode)
+  integrationCode String   @map("integration_code")  // Ex: "TV_BOX", "MOBILE", etc
+  
+  // ID do plano na Olé TV
+  olePlanoId      String   @map("ole_plano_id")
+  olePlanoNome    String?  @map("ole_plano_nome")     // Nome para referência
+  
+  // Prioridade (maior = mais importante)
+  // Usado para decidir qual plano usar quando vêm múltiplos IntegrationCodes
+  priority        Int      @default(0)
+  
+  // Tipo de plano
+  isMainPlan      Boolean  @default(true) @map("is_main_plan")  // Principal ou adicional
+  
+  // Metadados
+  description     String?  // Descrição do mapeamento
+  isActive        Boolean  @default(true) @map("is_active")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@unique([integrationId, integrationCode])
+  @@index([integrationId, priority])
+  @@map("product_plan_mappings")
 }

@@ -223,6 +223,52 @@ export class OleApiService {
   /**
    * Busca cliente por CPF/CNPJ
    * POST /clientes/buscacpfcnpj/{cpf_cnpj}
+   * 
+   * IMPORTANTE: Este é o método principal para verificar se cliente existe
+   * Retorna dados básicos do cliente se encontrado
+   */
+  async buscarCliente(documento: string): Promise<OleApiResponse<{
+    id: string;
+    nome: string;
+    cpf_cnpj: string;
+    status: string;
+    contractId?: string;
+  }>> {
+    // Limpa documento
+    const docLimpo = documento.replace(/\D/g, '');
+    
+    const result = await this.request(`/clientes/buscacpfcnpj/${docLimpo}`);
+    
+    if (result.success && result.data) {
+      // Normaliza resposta
+      const cliente = Array.isArray(result.data) ? result.data[0] : result.data;
+      
+      if (cliente) {
+        return {
+          success: true,
+          data: {
+            id: cliente.id?.toString(),
+            nome: cliente.nome,
+            cpf_cnpj: cliente.cpf_cnpj || cliente.cpfCnpj,
+            status: cliente.status?.toLowerCase() || 'active',
+            contractId: cliente.contrato_id?.toString() || cliente.contratoId?.toString(),
+          },
+          statusCode: result.statusCode,
+        };
+      }
+    }
+    
+    // Cliente não encontrado
+    return {
+      success: false,
+      error: result.error || 'Cliente não encontrado',
+      statusCode: result.statusCode,
+    };
+  }
+
+  /**
+   * Busca cliente por CPF/CNPJ (alias para compatibilidade)
+   * POST /clientes/buscacpfcnpj/{cpf_cnpj}
    */
   async buscarClientePorCpfCnpj(cpfCnpj: string): Promise<OleApiResponse> {
     return this.request(`/clientes/buscacpfcnpj/${cpfCnpj}`);
@@ -241,6 +287,11 @@ export class OleApiService {
    * POST /clientes/inserir
    */
   async inserirCliente(data: ClienteOleData): Promise<OleApiResponse> {
+    logger.info('Inserindo cliente na Olé TV', { 
+      nome: data.nome,
+      documento: data.cpf_cnpj,
+      tipoPessoa: data.tipo_pessoa,
+    });
     return this.request('/clientes/inserir', data);
   }
 
@@ -249,6 +300,7 @@ export class OleApiService {
    * POST /clientes/alterar/{id_cliente}
    */
   async alterarCliente(idCliente: string, data: Partial<ClienteOleData>): Promise<OleApiResponse> {
+    logger.info('Alterando cliente na Olé TV', { idCliente });
     return this.request(`/clientes/alterar/${idCliente}`, data);
   }
 
