@@ -57,6 +57,15 @@ export default function ResetSenha({ contratoCliente, emailCliente }: any) {
   }
 
   const handleOpenModal = () => {
+    // Validar se o contrato está disponível antes de abrir o modal
+    if (!contratoCliente) {
+      toast({
+        title: "Contrato não encontrado",
+        description: "Este cliente não possui número de contrato cadastrado. Não é possível resetar a senha.",
+        variant: "destructive",
+      })
+      return
+    }
     setOpenModal(true)
   }
 
