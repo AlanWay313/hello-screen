@@ -8,28 +8,38 @@ import prisma from '../lib/prisma';
 import { logger } from '../lib/logger';
 
 // ==========================================
-// CONFIGURAÇÕES DE RATE LIMITING
+// CONFIGURAÇÕES DE RATE LIMITING E PERFORMANCE
 // ==========================================
 
-const RATE_LIMIT_CONFIG = {
-  // Delay entre chamadas individuais (ms)
-  DELAY_BETWEEN_CALLS: 300,
-  
-  // Delay entre lotes de clientes (ms)
-  DELAY_BETWEEN_BATCHES: 1000,
-  
-  // Tamanho do lote para processar clientes
-  BATCH_SIZE: 10,
-  
-  // Máximo de retentativas em caso de erro 429
-  MAX_RETRIES: 3,
-  
-  // Delay inicial para retry (ms) - dobra a cada tentativa
-  INITIAL_RETRY_DELAY: 2000,
-  
-  // Delay máximo para retry (ms)
-  MAX_RETRY_DELAY: 30000,
+// Modos de sincronização: 'fast' para alta performance, 'safe' para evitar rate limit
+type SyncMode = 'fast' | 'safe';
+
+const RATE_LIMIT_PROFILES = {
+  // Modo rápido: para APIs que aguentam mais carga (17k+ clientes)
+  fast: {
+    DELAY_BETWEEN_CALLS: 50,        // 50ms entre chamadas
+    DELAY_BETWEEN_BATCHES: 200,     // 200ms entre lotes
+    BATCH_SIZE: 100,                // 100 clientes por lote
+    PARALLEL_REQUESTS: 10,          // 10 requests simultâneos
+    MAX_RETRIES: 5,
+    INITIAL_RETRY_DELAY: 1000,
+    MAX_RETRY_DELAY: 60000,
+  },
+  // Modo seguro: para evitar rate limiting
+  safe: {
+    DELAY_BETWEEN_CALLS: 200,       // 200ms entre chamadas
+    DELAY_BETWEEN_BATCHES: 500,     // 500ms entre lotes
+    BATCH_SIZE: 25,                 // 25 clientes por lote
+    PARALLEL_REQUESTS: 5,           // 5 requests simultâneos
+    MAX_RETRIES: 3,
+    INITIAL_RETRY_DELAY: 2000,
+    MAX_RETRY_DELAY: 30000,
+  },
 };
+
+// Configuração ativa (pode ser alterada via ENV ou parâmetro)
+const SYNC_MODE: SyncMode = (process.env.SYNC_MODE as SyncMode) || 'fast';
+const RATE_LIMIT_CONFIG = RATE_LIMIT_PROFILES[SYNC_MODE];
 
 // ==========================================
 // TIPOS E INTERFACES
@@ -130,7 +140,8 @@ export class SyncFromOleService {
   }
 
   /**
-   * Processa itens em lotes com delay entre eles
+   * Processa itens em lotes com PARALELISMO dentro de cada lote
+   * Otimizado para alto volume (17k+ registros)
    */
   private async processInBatches<T, R>(
     items: T[],
@@ -141,6 +152,9 @@ export class SyncFromOleService {
     const results: R[] = [];
     const errors: string[] = [];
     const totalBatches = Math.ceil(items.length / batchSize);
+    const parallelLimit = RATE_LIMIT_CONFIG.PARALLEL_REQUESTS;
+
+    logger.info(`⚡ Modo: ${SYNC_MODE.toUpperCase()} | Batch: ${batchSize} | Paralelo: ${parallelLimit}`);
 
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
@@ -149,33 +163,68 @@ export class SyncFromOleService {
       // Log do lote atual
       logger.syncBatch(batchNumber, totalBatches, batch.length);
 
-      // Processa cada item do lote com delay
-      for (let j = 0; j < batch.length; j++) {
-        try {
-          const result = await processor(batch[j], i + j);
-          results.push(result);
-          
-          // Atualiza progresso
-          logger.syncProgress(entityName, i + j + 1, items.length);
-          
-          // Delay entre chamadas individuais
-          if (j < batch.length - 1) {
-            await this.delay(RATE_LIMIT_CONFIG.DELAY_BETWEEN_CALLS);
+      // Processa o lote com paralelismo controlado
+      const batchResults = await this.processWithConcurrency(
+        batch,
+        async (item, localIndex) => {
+          const globalIndex = i + localIndex;
+          try {
+            const result = await processor(item, globalIndex);
+            
+            // Atualiza progresso a cada 10 itens para não sobrecarregar o console
+            if ((globalIndex + 1) % 10 === 0 || globalIndex + 1 === items.length) {
+              logger.syncProgress(entityName, globalIndex + 1, items.length);
+            }
+            
+            return { success: true, result };
+          } catch (error: any) {
+            return { success: false, error: error.message || 'Erro desconhecido' };
           }
-        } catch (error: any) {
-          errors.push(error.message || 'Erro desconhecido');
+        },
+        parallelLimit
+      );
+
+      // Coleta resultados e erros
+      for (const res of batchResults) {
+        if (res.success) {
+          results.push(res.result);
+        } else {
+          errors.push(res.error);
         }
       }
 
       // Delay entre lotes (exceto no último)
       if (i + batchSize < items.length) {
-        console.log(''); // Nova linha após barra de progresso
         await this.delay(RATE_LIMIT_CONFIG.DELAY_BETWEEN_BATCHES);
       }
     }
 
     console.log(''); // Nova linha final
     return { results, errors };
+  }
+
+  /**
+   * Processa array com limite de concorrência (semáforo)
+   * Evita abrir milhares de conexões simultâneas
+   */
+  private async processWithConcurrency<T, R>(
+    items: T[],
+    processor: (item: T, index: number) => Promise<R>,
+    limit: number
+  ): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    let currentIndex = 0;
+
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (currentIndex < items.length) {
+        const index = currentIndex++;
+        await this.delay(RATE_LIMIT_CONFIG.DELAY_BETWEEN_CALLS);
+        results[index] = await processor(items[index], index);
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
   }
 
   // ==========================================
