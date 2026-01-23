@@ -12,6 +12,7 @@ import { Configuracoes } from "./pages/Configuracoes";
 import { Usuarios } from "./pages/Usuarios";
 import Conta from "./pages/Conta";
 import { Changelog } from "./pages/Changelog";
+import { ApiDocs } from "./pages/ApiDocs";
 
 
 const isLogged = (): boolean => {
@@ -87,8 +88,8 @@ export const routes = createBrowserRouter([
     path: "/login",
     element: isLogged() ? <Navigate to="/" /> : <Login />,
   },
-
-],
-
-
-);
+  {
+    path: "/api-docs",
+    element: <ApiDocs />,
+  },
+]);
