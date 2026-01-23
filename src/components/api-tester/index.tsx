@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,9 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Globe
+  Globe,
+  Save,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +40,14 @@ interface ApiTesterProps {
   onClose: () => void;
 }
 
+interface EnvironmentConfig {
+  producao: string;
+  teste: string;
+}
+
+const STORAGE_KEY = 'api-tester-environments';
+const SELECTED_ENV_KEY = 'api-tester-selected-env';
+
 // Extrai o path do endpoint (sem a base URL)
 const extractPath = (url: string): string => {
   try {
@@ -48,11 +58,35 @@ const extractPath = (url: string): string => {
   }
 };
 
-// Ambientes pré-definidos
-const ENVIRONMENTS = [
-  { label: 'Produção', value: 'https://api.oletv.net.br' },
-  { label: 'Teste', value: 'https://api-teste.oletv.net.br' },
-];
+// Valores padrão
+const DEFAULT_ENVIRONMENTS: EnvironmentConfig = {
+  producao: 'https://api.oletv.net.br',
+  teste: 'https://api-teste.oletv.net.br',
+};
+
+const loadEnvironments = (): EnvironmentConfig => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      return { ...DEFAULT_ENVIRONMENTS, ...JSON.parse(saved) };
+    }
+  } catch (e) {
+    console.error('Erro ao carregar ambientes:', e);
+  }
+  return DEFAULT_ENVIRONMENTS;
+};
+
+const loadSelectedEnv = (): 'producao' | 'teste' => {
+  try {
+    const saved = localStorage.getItem(SELECTED_ENV_KEY);
+    if (saved === 'producao' || saved === 'teste') {
+      return saved;
+    }
+  } catch (e) {
+    console.error('Erro ao carregar ambiente selecionado:', e);
+  }
+  return 'producao';
+};
 
 export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
@@ -61,9 +95,18 @@ export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
   const [responseStatus, setResponseStatus] = useState<'success' | 'error' | null>(null);
   const [copied, setCopied] = useState(false);
   const [showParams, setShowParams] = useState(true);
-  const [baseUrl, setBaseUrl] = useState(ENVIRONMENTS[0].value);
-  const [customBaseUrl, setCustomBaseUrl] = useState('');
-  const [useCustomUrl, setUseCustomUrl] = useState(false);
+  const [showEnvSettings, setShowEnvSettings] = useState(false);
+  
+  // Ambiente
+  const [environments, setEnvironments] = useState<EnvironmentConfig>(loadEnvironments);
+  const [selectedEnv, setSelectedEnv] = useState<'producao' | 'teste'>(loadSelectedEnv);
+  const [editingEnvs, setEditingEnvs] = useState<EnvironmentConfig>(environments);
+  const [envSaved, setEnvSaved] = useState(false);
+
+  // Salvar ambiente selecionado
+  useEffect(() => {
+    localStorage.setItem(SELECTED_ENV_KEY, selectedEnv);
+  }, [selectedEnv]);
 
   if (!endpoint) return null;
 
@@ -77,7 +120,14 @@ export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
   };
 
   const getActiveBaseUrl = () => {
-    return useCustomUrl ? customBaseUrl : baseUrl;
+    return environments[selectedEnv];
+  };
+
+  const saveEnvironments = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(editingEnvs));
+    setEnvironments(editingEnvs);
+    setEnvSaved(true);
+    setTimeout(() => setEnvSaved(false), 2000);
   };
 
   const buildUrl = () => {
@@ -156,41 +206,74 @@ export function ApiTester({ endpoint, onClose }: ApiTesterProps) {
       {/* Environment Selector */}
       <div className="px-4 py-3 bg-muted/30 border-b border-border shrink-0 space-y-3">
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <Globe className="h-3 w-3" />
-            Ambiente
-          </Label>
-          <div className="flex gap-2">
-            {ENVIRONMENTS.map((env) => (
-              <Button
-                key={env.value}
-                variant={!useCustomUrl && baseUrl === env.value ? "default" : "outline"}
-                size="sm"
-                className="h-7 text-xs flex-1"
-                onClick={() => {
-                  setBaseUrl(env.value);
-                  setUseCustomUrl(false);
-                }}
-              >
-                {env.label}
-              </Button>
-            ))}
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Globe className="h-3 w-3" />
+              Ambiente
+            </Label>
             <Button
-              variant={useCustomUrl ? "default" : "outline"}
+              variant="ghost"
               size="sm"
-              className="h-7 text-xs"
-              onClick={() => setUseCustomUrl(true)}
+              className="h-6 w-6 p-0"
+              onClick={() => {
+                setShowEnvSettings(!showEnvSettings);
+                setEditingEnvs(environments);
+              }}
             >
-              Outro
+              <Settings className="h-3.5 w-3.5" />
             </Button>
           </div>
-          {useCustomUrl && (
-            <Input
-              placeholder="https://sua-api.com"
-              value={customBaseUrl}
-              onChange={(e) => setCustomBaseUrl(e.target.value)}
-              className="h-8 text-xs font-mono"
-            />
+          
+          {/* Environment Toggle */}
+          <div className="flex gap-2">
+            <Button
+              variant={selectedEnv === 'producao' ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-xs flex-1"
+              onClick={() => setSelectedEnv('producao')}
+            >
+              Produção
+            </Button>
+            <Button
+              variant={selectedEnv === 'teste' ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-xs flex-1"
+              onClick={() => setSelectedEnv('teste')}
+            >
+              Teste
+            </Button>
+          </div>
+
+          {/* Environment Settings */}
+          {showEnvSettings && (
+            <div className="space-y-2 p-3 bg-background/50 rounded-lg border border-border">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">URL Produção</Label>
+                <Input
+                  placeholder="https://api.oletv.net.br"
+                  value={editingEnvs.producao}
+                  onChange={(e) => setEditingEnvs(prev => ({ ...prev, producao: e.target.value }))}
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">URL Teste</Label>
+                <Input
+                  placeholder="https://api-teste.oletv.net.br"
+                  value={editingEnvs.teste}
+                  onChange={(e) => setEditingEnvs(prev => ({ ...prev, teste: e.target.value }))}
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <Button
+                size="sm"
+                className="w-full h-7 text-xs gap-1.5"
+                onClick={saveEnvironments}
+              >
+                {envSaved ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
+                {envSaved ? 'Salvo!' : 'Salvar URLs'}
+              </Button>
+            </div>
           )}
         </div>
 
