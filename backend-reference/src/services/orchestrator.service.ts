@@ -110,37 +110,144 @@ export class OrchestratorService {
 
   /**
    * Handler para criação de cliente
+   * FLUXO: Webhook → Salva Local (PENDING) → Enriquece → Valida na OLÉ → Decide
    */
   private async handleCreate(payload: WebhookPayload): Promise<OrchestrationResult> {
-    const oleApi = await this.getOleApi();
+    // =============================================
+    // PASSO 1: PERSISTIR LOCALMENTE PRIMEIRO (PENDING_VALIDATION)
+    // =============================================
+    logger.info('Salvando dados localmente para validação...', { 
+      documento: payload.documento,
+      externalId: payload.externalId 
+    });
 
-    // 1. Busca dados complementares na API externa
-    logger.info('Buscando dados complementares...', { documento: payload.documento });
-    const complementaryData = await this.externalApi.buscarCliente(payload.documento);
+    // Verifica se já existe no cache local
+    let localClient = await prisma.clientCache.findFirst({
+      where: {
+        integrationId: this.integrationId,
+        OR: [
+          { externalId: payload.externalId },
+          { document: payload.documento },
+        ],
+      },
+    });
 
-    // 2. Mescla dados do webhook com dados complementares
+    // Cria registro local se não existir
+    if (!localClient) {
+      localClient = await prisma.clientCache.create({
+        data: {
+          integrationId: this.integrationId,
+          externalId: payload.externalId,
+          document: payload.documento,
+          name: payload.nome || '',
+          email: payload.email || '',
+          phone: payload.telefone || '',
+          rawWebhookData: payload as any, // Dados originais do webhook
+          status: 'PENDING_VALIDATION',   // Aguardando validação
+          complementaryData: null,
+        },
+      });
+      logger.info('Cliente salvo localmente', { localId: localClient.id });
+    } else {
+      // Atualiza com novos dados do webhook
+      localClient = await prisma.clientCache.update({
+        where: { id: localClient.id },
+        data: {
+          rawWebhookData: payload as any,
+          status: 'PENDING_VALIDATION',
+        },
+      });
+      logger.info('Cliente local atualizado', { localId: localClient.id });
+    }
+
+    // =============================================
+    // PASSO 2: BUSCAR DADOS COMPLEMENTARES (ENRICHMENT)
+    // =============================================
+    logger.info('Buscando dados complementares na API externa...', { 
+      documento: payload.documento 
+    });
+    
+    let complementaryData: any = null;
+    try {
+      complementaryData = await this.externalApi.buscarCliente(payload.documento);
+      
+      // Atualiza cache com dados complementares
+      await prisma.clientCache.update({
+        where: { id: localClient.id },
+        data: {
+          complementaryData: complementaryData || {},
+          status: 'ENRICHED',
+        },
+      });
+      logger.info('Dados complementares salvos', { 
+        localId: localClient.id,
+        hasData: !!complementaryData 
+      });
+    } catch (error: any) {
+      logger.warn('Falha ao buscar dados complementares', { 
+        error: error.message,
+        documento: payload.documento 
+      });
+      // Continua mesmo sem dados complementares
+    }
+
+    // =============================================
+    // PASSO 3: MESCLAR DADOS (WEBHOOK + COMPLEMENTARES)
+    // =============================================
     const clienteData = this.mergeClientData(payload, complementaryData);
 
-    // 3. Verifica se cliente já existe na Olé
-    logger.info('Verificando cliente na Olé...', { documento: payload.documento });
+    // Atualiza cache com dados mesclados
+    await prisma.clientCache.update({
+      where: { id: localClient.id },
+      data: {
+        name: clienteData.nome,
+        email: clienteData.email,
+        phone: clienteData.telefone,
+        address: clienteData.endereco ? {
+          logradouro: clienteData.endereco,
+          numero: clienteData.numero,
+          bairro: clienteData.bairro,
+          cidade: clienteData.cidade,
+          estado: clienteData.estado,
+          cep: clienteData.cep,
+        } : null,
+        status: 'VALIDATED',
+      },
+    });
+
+    // =============================================
+    // PASSO 4: VERIFICAR ESTADO NA OLÉ (REMOTE CHECK)
+    // =============================================
+    const oleApi = await this.getOleApi();
+    logger.info('Verificando cliente na API OLÉ...', { documento: payload.documento });
+    
     const oleClientResult = await oleApi.buscarCliente(payload.documento);
 
-    // 4. Decisão baseada no estado atual
+    // =============================================
+    // PASSO 5: DECISÃO E CRIAÇÃO DA AÇÃO DE SYNC
+    // =============================================
     if (oleClientResult.success && oleClientResult.data) {
       const oleClient = oleClientResult.data;
 
-      // Cliente existe - verificar status
+      // Salva referência da OLÉ no cache local
+      await prisma.clientCache.update({
+        where: { id: localClient.id },
+        data: {
+          oleClientId: oleClient.id,
+          oleContractId: oleClient.contractId || null,
+        },
+      });
+
+      // Cliente existe na OLÉ - verificar status
       if (oleClient.status === 'cancelled' || oleClient.status === 'inactive') {
-        // Reativar cliente
-        return await this.reactivateClient(oleClient.id, clienteData, payload);
+        return await this.reactivateClient(oleClient.id, clienteData, payload, localClient.id);
       } else {
-        // Cliente já ativo - apenas atualizar
-        return await this.updateClient(oleClient.id, clienteData, payload);
+        return await this.updateClient(oleClient.id, clienteData, payload, localClient.id);
       }
     }
 
-    // 5. Cliente não existe - criar
-    return await this.createClient(clienteData, payload);
+    // Cliente não existe na OLÉ - criar
+    return await this.createClient(clienteData, payload, localClient.id);
   }
 
   /**
@@ -222,106 +329,114 @@ export class OrchestratorService {
   // ==========================================
 
   /**
-   * Cria novo cliente
+   * Cria novo cliente na OLÉ
+   * (Dados já foram persistidos localmente antes de chegar aqui)
    */
   private async createClient(
     clienteData: Record<string, any>,
-    originalPayload: WebhookPayload
+    originalPayload: WebhookPayload,
+    localClientId: string
   ): Promise<OrchestrationResult> {
-    // Adiciona à fila
-    const queueId = await this.syncQueue.addToQueue('CREATE_CLIENT', clienteData, {
-      priority: 1, // Alta prioridade para criação
+    // Adiciona à fila de sincronização
+    const queueId = await this.syncQueue.addToQueue('CREATE_CLIENT', {
+      ...clienteData,
+      localClientId, // Referência ao registro local
+    }, {
+      priority: 1,
     });
 
-    // Salva no cache local
-    await prisma.clientCache.create({
-      data: {
-        integrationId: this.integrationId,
-        externalId: originalPayload.externalId,
-        document: originalPayload.documento,
-        name: clienteData.nome,
-        email: clienteData.email,
-        phone: clienteData.telefone,
-        address: clienteData.endereco ? {
-          logradouro: clienteData.endereco,
-          numero: clienteData.numero,
-          bairro: clienteData.bairro,
-          cidade: clienteData.cidade,
-          estado: clienteData.estado,
-          cep: clienteData.cep,
-        } : null,
-        complementaryData: clienteData,
-        status: 'PENDING_SYNC',
-      },
+    // Atualiza status no cache local
+    await prisma.clientCache.update({
+      where: { id: localClientId },
+      data: { status: 'PENDING_SYNC' },
+    });
+
+    logger.info('Cliente adicionado à fila de criação', { 
+      localClientId, 
+      queueId 
     });
 
     return {
       success: true,
       action: 'queued',
-      message: 'Cliente adicionado à fila de criação',
-      data: { queueId },
+      message: 'Cliente validado localmente e adicionado à fila de criação',
+      data: { queueId, localClientId },
     };
   }
 
   /**
-   * Atualiza cliente existente
+   * Atualiza cliente existente na OLÉ
    */
   private async updateClient(
     oleClientId: string,
     clienteData: Record<string, any>,
-    originalPayload: WebhookPayload
+    originalPayload: WebhookPayload,
+    localClientId: string
   ): Promise<OrchestrationResult> {
     const queueId = await this.syncQueue.addToQueue('UPDATE_CLIENT', {
       idCliente: oleClientId,
+      localClientId,
       ...clienteData,
     });
 
-    // Atualiza cache
-    await prisma.clientCache.updateMany({
-      where: {
-        integrationId: this.integrationId,
-        externalId: originalPayload.externalId,
-      },
-      data: {
-        name: clienteData.nome,
-        email: clienteData.email,
-        phone: clienteData.telefone,
-        complementaryData: clienteData,
-        status: 'PENDING_SYNC',
-      },
+    // Atualiza status no cache local
+    await prisma.clientCache.update({
+      where: { id: localClientId },
+      data: { status: 'PENDING_SYNC' },
+    });
+
+    logger.info('Cliente adicionado à fila de atualização', { 
+      localClientId, 
+      oleClientId,
+      queueId 
     });
 
     return {
       success: true,
       action: 'queued',
-      message: 'Atualização adicionada à fila',
-      data: { queueId },
+      message: 'Cliente validado e adicionado à fila de atualização',
+      data: { queueId, localClientId },
     };
   }
 
   /**
-   * Reativa cliente cancelado
+   * Reativa cliente cancelado na OLÉ
    */
   private async reactivateClient(
     oleClientId: string,
     clienteData: Record<string, any>,
-    originalPayload: WebhookPayload
+    originalPayload: WebhookPayload,
+    localClientId: string
   ): Promise<OrchestrationResult> {
     // Primeiro reativa, depois atualiza dados
     await this.syncQueue.addToQueue('REACTIVATE_CLIENT', {
       idCliente: oleClientId,
+      localClientId,
     }, { priority: 2 });
 
     const queueId = await this.syncQueue.addToQueue('UPDATE_CLIENT', {
       idCliente: oleClientId,
+      localClientId,
       ...clienteData,
     }, { priority: 1 });
+
+    // Atualiza status no cache local
+    await prisma.clientCache.update({
+      where: { id: localClientId },
+      data: { status: 'PENDING_REACTIVATION' },
+    });
+
+    logger.info('Cliente adicionado à fila de reativação', { 
+      localClientId, 
+      oleClientId,
+      queueId 
+    });
 
     return {
       success: true,
       action: 'queued',
-      message: 'Reativação e atualização adicionadas à fila',
-      data: { queueId },
+      message: 'Cliente validado e adicionado à fila de reativação',
+      data: { queueId, localClientId },
     };
   }
 

@@ -134,10 +134,16 @@ model SyncLog {
 // ==========================================
 
 enum ClientStatus {
-  ACTIVE
-  INACTIVE
-  CANCELLED
-  PENDING_SYNC
+  PENDING_VALIDATION    // Recém recebido do webhook, aguardando validação
+  ENRICHED              // Dados complementares buscados
+  VALIDATED             // Validado e mesclado
+  PENDING_SYNC          // Na fila para sincronizar com OLÉ
+  PENDING_REACTIVATION  // Na fila para reativar na OLÉ
+  SYNCED                // Sincronizado com sucesso
+  SYNC_FAILED           // Falha na sincronização
+  ACTIVE                // Ativo na OLÉ
+  INACTIVE              // Inativo na OLÉ
+  CANCELLED             // Cancelado
 }
 
 model ClientCache {
@@ -156,11 +162,18 @@ model ClientCache {
   phone           String?
   address         Json?        // Endereço completo
   
+  // Dados do webhook original (para auditoria e reprocessamento)
+  rawWebhookData  Json?        @map("raw_webhook_data")
+  
   // Dados complementares (da API externa)
   complementaryData Json?      @map("complementary_data")
   
+  // Validação e erros
+  validationErrors Json?       @map("validation_errors")
+  lastSyncError    String?     @map("last_sync_error") @db.Text
+  
   // Status
-  status          ClientStatus @default(PENDING_SYNC)
+  status          ClientStatus @default(PENDING_VALIDATION)
   syncedAt        DateTime?    @map("synced_at")
   
   // Timestamps
@@ -176,6 +189,7 @@ model ClientCache {
   @@unique([integrationId, externalId])
   @@unique([integrationId, document])
   @@index([oleClientId])
+  @@index([status])
   @@map("clients_cache")
 }
 
