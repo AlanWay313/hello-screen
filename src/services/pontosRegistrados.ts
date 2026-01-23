@@ -28,18 +28,14 @@ export async function buscarPontosRegistrados(idContrato: number | string): Prom
   }
 
   try {
+    const formData = new FormData();
+    formData.append('keyapi', keyapi);
+    formData.append('login', login);
+    formData.append('pass', pass);
+
     const response = await axios.post<PontosResponse>(
       `https://api.oletv.net.br/contratos/pontosregistrados/${idContrato}`,
-      {
-        keyapi,
-        login,
-        pass
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
+      formData
     );
 
     return response.data;
