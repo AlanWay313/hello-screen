@@ -1,0 +1,234 @@
+// Prisma Schema - Estrutura do Banco de Dados
+// Para usar: npx prisma migrate dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// TABELAS DE INTEGRAÇÃO E AUTENTICAÇÃO
+// ==========================================
+
+model Integration {
+  id              String   @id @default(uuid())
+  userId          String   @unique @map("user_id")
+  
+  // Credenciais da API Olé
+  oleKeyapi       String   @map("ole_keyapi")
+  oleLogin        String   @map("ole_login")
+  olePassword     String   @map("ole_password") // Criptografado
+  
+  // Status
+  isActive        Boolean  @default(true) @map("is_active")
+  lastSync        DateTime? @map("last_sync")
+  
+  // Configurações
+  webhookSecret   String?  @map("webhook_secret")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamentos
+  syncQueue       SyncQueue[]
+  syncLogs        SyncLog[]
+  clientsCache    ClientCache[]
+  
+  @@map("integrations")
+}
+
+// ==========================================
+// FILA DE SINCRONIZAÇÃO
+// ==========================================
+
+enum SyncStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum SyncAction {
+  CREATE_CLIENT
+  UPDATE_CLIENT
+  REACTIVATE_CLIENT
+  CREATE_CONTRACT
+  UPDATE_CONTRACT
+  CANCEL_CONTRACT
+  CREATE_PRODUCT
+  UPDATE_PRODUCT
+  DELETE_PRODUCT
+}
+
+model SyncQueue {
+  id              String     @id @default(uuid())
+  integrationId   String     @map("integration_id")
+  
+  // Ação e dados
+  action          SyncAction
+  payload         Json       // Dados a serem enviados
+  priority        Int        @default(0) // 0 = normal, 1+ = alta prioridade
+  
+  // Status e controle
+  status          SyncStatus @default(PENDING)
+  attempts        Int        @default(0)
+  maxAttempts     Int        @default(3) @map("max_attempts")
+  
+  // Logs de erro
+  errorLog        String?    @map("error_log") @db.Text
+  lastError       String?    @map("last_error")
+  
+  // Timestamps
+  scheduledFor    DateTime?  @map("scheduled_for")
+  processedAt     DateTime?  @map("processed_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  
+  // Relacionamento
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@index([status, scheduledFor])
+  @@index([integrationId, status])
+  @@map("sync_queue")
+}
+
+// ==========================================
+// LOGS DE SINCRONIZAÇÃO (AUDITORIA)
+// ==========================================
+
+model SyncLog {
+  id              String   @id @default(uuid())
+  integrationId   String   @map("integration_id")
+  
+  // Detalhes da requisição
+  endpoint        String
+  method          String   @default("POST")
+  requestBody     Json?    @map("request_body")
+  
+  // Resposta
+  responseBody    Json?    @map("response_body")
+  statusCode      Int?     @map("status_code")
+  
+  // Metadata
+  duration        Int?     // em milissegundos
+  success         Boolean  @default(false)
+  errorMessage    String?  @map("error_message") @db.Text
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // Relacionamento
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@index([integrationId, createdAt])
+  @@index([success, createdAt])
+  @@map("sync_logs")
+}
+
+// ==========================================
+// CACHE DE CLIENTES (DADOS LOCAIS)
+// ==========================================
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  PENDING_SYNC
+}
+
+model ClientCache {
+  id              String       @id @default(uuid())
+  integrationId   String       @map("integration_id")
+  
+  // Identificadores externos
+  externalId      String       @map("external_id") // ID do sistema externo (webhook)
+  oleClientId     String?      @map("ole_client_id") // ID na API Olé
+  oleContractId   String?      @map("ole_contract_id")
+  
+  // Dados do cliente
+  document        String       // CPF/CNPJ
+  name            String
+  email           String?
+  phone           String?
+  address         Json?        // Endereço completo
+  
+  // Dados complementares (da API externa)
+  complementaryData Json?      @map("complementary_data")
+  
+  // Status
+  status          ClientStatus @default(PENDING_SYNC)
+  syncedAt        DateTime?    @map("synced_at")
+  
+  // Timestamps
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  
+  // Relacionamento
+  integration     Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  // Produtos do cliente
+  products        ProductCache[]
+  
+  @@unique([integrationId, externalId])
+  @@unique([integrationId, document])
+  @@index([oleClientId])
+  @@map("clients_cache")
+}
+
+// ==========================================
+// CACHE DE PRODUTOS
+// ==========================================
+
+model ProductCache {
+  id              String   @id @default(uuid())
+  clientCacheId   String   @map("client_cache_id")
+  
+  // Identificadores
+  externalId      String   @map("external_id")
+  oleProductId    String?  @map("ole_product_id")
+  
+  // Dados do produto
+  name            String
+  code            String?
+  price           Decimal? @db.Decimal(10, 2)
+  quantity        Int      @default(1)
+  
+  // Status
+  isActive        Boolean  @default(true) @map("is_active")
+  syncedAt        DateTime? @map("synced_at")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relacionamento
+  clientCache     ClientCache @relation(fields: [clientCacheId], references: [id], onDelete: Cascade)
+  
+  @@unique([clientCacheId, externalId])
+  @@map("products_cache")
+}
+
+// ==========================================
+// TOKENS E SESSÕES (API Externa)
+// ==========================================
+
+model ExternalApiToken {
+  id              String   @id @default(uuid())
+  integrationId   String   @unique @map("integration_id")
+  
+  // Token
+  accessToken     String   @map("access_token") @db.Text
+  tokenType       String   @default("Bearer") @map("token_type")
+  expiresAt       DateTime @map("expires_at")
+  
+  // Metadata
+  scope           String?
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@map("external_api_tokens")
+}
