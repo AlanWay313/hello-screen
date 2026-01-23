@@ -1,4 +1,5 @@
 // Serviço de Integração com API Olé TV
+// Baseado na documentação oficial: /api-docs
 import FormData from 'form-data';
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { env } from '../config/env';
@@ -24,16 +25,20 @@ interface OleApiResponse<T = any> {
 }
 
 interface ClienteOleData {
-  documento: string;
   nome: string;
-  email?: string;
-  telefone?: string;
-  endereco?: string;
-  numero?: string;
-  bairro?: string;
-  cidade?: string;
-  estado?: string;
-  cep?: string;
+  tipo_pessoa: 'F' | 'J';
+  cpf_cnpj: string;
+  dia_vencimento: number;
+  endereco_cobranca: boolean;
+  nome_fantasia?: string;
+  data_nascimento?: string;
+  endereco_cep?: string;
+  endereco_logradouro?: string;
+  endereco_numero?: string;
+  endereco_bairro?: string;
+  telefone_ddd?: string[];
+  telefone_numero?: string[];
+  email?: string[];
   [key: string]: any;
 }
 
@@ -51,7 +56,7 @@ export class OleApiService {
     this.credentials = credentials;
     
     this.client = axios.create({
-      baseURL: env.OLE_API_BASE_URL,
+      baseURL: env.OLE_API_BASE_URL, // https://api.oletv.net.br
       timeout: parseInt(env.OLE_API_TIMEOUT),
     });
   }
@@ -76,7 +81,7 @@ export class OleApiService {
     const credentials: OleCredentials = {
       keyapi: integration.oleKeyapi,
       login: integration.oleLogin,
-      password: decrypt(integration.olePassword), // Descriptografa a senha
+      password: decrypt(integration.olePassword),
     };
 
     return new OleApiService(integrationId, credentials);
@@ -89,15 +94,19 @@ export class OleApiService {
   private createFormData(params: Record<string, any>): FormData {
     const formData = new FormData();
     
-    // Adiciona credenciais
+    // Adiciona credenciais obrigatórias
     formData.append('keyapi', this.credentials.keyapi);
     formData.append('login', this.credentials.login);
     formData.append('pass', this.credentials.password);
     
-    // Adiciona parâmetros
+    // Adiciona parâmetros extras
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        formData.append(key, String(value));
+        if (Array.isArray(value)) {
+          value.forEach(v => formData.append(key, String(v)));
+        } else {
+          formData.append(key, String(value));
+        }
       }
     });
 
@@ -134,7 +143,7 @@ export class OleApiService {
 
   private async request<T>(
     endpoint: string,
-    params: Record<string, any>
+    params: Record<string, any> = {}
   ): Promise<OleApiResponse<T>> {
     const startTime = Date.now();
     const formData = this.createFormData(params);
@@ -200,143 +209,240 @@ export class OleApiService {
   }
 
   // ==========================================
-  // CLIENTES
+  // CLIENTES - Documentação: /api-docs
   // ==========================================
 
   /**
-   * Busca cliente por documento (CPF/CNPJ)
+   * Lista todos os clientes cadastrados
+   * POST /clientes/listar
    */
-  async buscarCliente(documento: string): Promise<OleApiResponse> {
-    return this.request('/buscar-cliente.php', { documento });
+  async listarClientes(): Promise<OleApiResponse> {
+    return this.request('/clientes/listar');
   }
 
   /**
-   * Busca cliente por ID interno da Olé
+   * Busca cliente por CPF/CNPJ
+   * POST /clientes/buscacpfcnpj/{cpf_cnpj}
    */
-  async buscarClientePorId(idCliente: string): Promise<OleApiResponse> {
-    return this.request('/buscar-cliente.php', { idCliente });
+  async buscarClientePorCpfCnpj(cpfCnpj: string): Promise<OleApiResponse> {
+    return this.request(`/clientes/buscacpfcnpj/${cpfCnpj}`);
   }
 
   /**
-   * Cadastra novo cliente
+   * Busca dados completos de um cliente
+   * POST /clientes/buscadados/{id_cliente}
    */
-  async cadastrarCliente(data: ClienteOleData): Promise<OleApiResponse> {
-    return this.request('/cadastrar-cliente.php', data);
+  async buscarDadosCliente(idCliente: string): Promise<OleApiResponse> {
+    return this.request(`/clientes/buscadados/${idCliente}`);
   }
 
   /**
-   * Edita cliente existente
+   * Insere um novo cliente
+   * POST /clientes/inserir
    */
-  async editarCliente(idCliente: string, data: Partial<ClienteOleData>): Promise<OleApiResponse> {
-    return this.request('/editar-cliente.php', { idCliente, ...data });
+  async inserirCliente(data: ClienteOleData): Promise<OleApiResponse> {
+    return this.request('/clientes/inserir', data);
+  }
+
+  /**
+   * Altera dados de um cliente existente
+   * POST /clientes/alterar/{id_cliente}
+   */
+  async alterarCliente(idCliente: string, data: Partial<ClienteOleData>): Promise<OleApiResponse> {
+    return this.request(`/clientes/alterar/${idCliente}`, data);
   }
 
   // ==========================================
-  // CONTRATOS
+  // BOLETOS - Documentação: /api-docs
   // ==========================================
 
   /**
-   * Busca contratos de um cliente
+   * Lista todos os boletos de um cliente
+   * POST /boletos/listar/{id_cliente}
    */
-  async buscarContratos(idCliente: string): Promise<OleApiResponse> {
-    return this.request('/buscar-contratos.php', { idCliente });
+  async listarBoletos(idCliente: string): Promise<OleApiResponse> {
+    return this.request(`/boletos/listar/${idCliente}`);
   }
 
   /**
-   * Cadastra novo contrato
+   * Busca boletos por CPF/CNPJ e status
+   * POST /boletos/buscacpfcnpj/{cpf_cnpj}/{status?}
    */
-  async cadastrarContrato(idCliente: string, data: Record<string, any>): Promise<OleApiResponse> {
-    return this.request('/cadastrar-contrato.php', { idCliente, ...data });
+  async buscarBoletosPorCpfCnpj(cpfCnpj: string, status?: 'Aberto' | 'Pago'): Promise<OleApiResponse> {
+    const endpoint = status 
+      ? `/boletos/buscacpfcnpj/${cpfCnpj}/${status}`
+      : `/boletos/buscacpfcnpj/${cpfCnpj}`;
+    return this.request(endpoint);
   }
 
   /**
-   * Cancela contrato
+   * Busca boletos por ID do contrato
+   * POST /boletos/buscacontrato/{id_contrato}
    */
-  async cancelarContrato(idContrato: string, motivo?: string): Promise<OleApiResponse> {
-    return this.request('/cancelar-contrato.php', { idContrato, motivo });
+  async buscarBoletosPorContrato(idContrato: string): Promise<OleApiResponse> {
+    return this.request(`/boletos/buscacontrato/${idContrato}`);
   }
 
   /**
-   * Reativa contrato cancelado
+   * Visualiza o PDF de um boleto (retorna Base64)
+   * POST /boletos/visualizar/{id_boleto}
    */
-  async reativarContrato(idContrato: string): Promise<OleApiResponse> {
-    return this.request('/reativar-contrato.php', { idContrato });
+  async visualizarBoleto(idBoleto: string): Promise<OleApiResponse> {
+    return this.request(`/boletos/visualizar/${idBoleto}`);
+  }
+
+  /**
+   * Registra a baixa/pagamento de um boleto
+   * POST /boletos/baixa/{id_boleto}
+   */
+  async baixarBoleto(
+    idBoleto: string, 
+    dataPagamento: string, 
+    valorPago: string, 
+    comentario?: string
+  ): Promise<OleApiResponse> {
+    return this.request(`/boletos/baixa/${idBoleto}`, {
+      data_pagamento: dataPagamento,
+      valor_pago: valorPago,
+      comentario,
+    });
   }
 
   // ==========================================
-  // PRODUTOS
+  // CONTRATOS - Documentação: /api-docs
   // ==========================================
 
   /**
-   * Lista produtos disponíveis
+   * Lista todos os planos disponíveis para contratação
+   * POST /planos
    */
-  async listarProdutos(): Promise<OleApiResponse> {
-    return this.request('/listar-produtos.php', {});
+  async listarPlanos(): Promise<OleApiResponse> {
+    return this.request('/planos');
   }
 
   /**
-   * Adiciona produto ao contrato
+   * Lista todos os modelos de equipamentos disponíveis
+   * POST /equipamentos
    */
-  async adicionarProduto(idContrato: string, idProduto: string, quantidade: number = 1): Promise<OleApiResponse> {
-    return this.request('/adicionar-produto.php', { idContrato, idProduto, quantidade });
+  async listarEquipamentos(): Promise<OleApiResponse> {
+    return this.request('/equipamentos');
   }
 
   /**
-   * Remove produto do contrato
+   * Lista todos os contratos de um cliente
+   * POST /contratos/listar/{id_cliente}
    */
-  async removerProduto(idContrato: string, idProduto: string): Promise<OleApiResponse> {
-    return this.request('/remover-produto.php', { idContrato, idProduto });
+  async listarContratos(idCliente: string): Promise<OleApiResponse> {
+    return this.request(`/contratos/listar/${idCliente}`);
+  }
+
+  /**
+   * Altera o e-mail do usuário de um contrato
+   * POST /contratos/alterarusuario/{id_contrato}
+   */
+  async alterarUsuarioContrato(idContrato: string, emailUsuario: string): Promise<OleApiResponse> {
+    return this.request(`/contratos/alterarusuario/${idContrato}`, {
+      email_usuario: emailUsuario,
+    });
+  }
+
+  /**
+   * Insere um novo contrato para um cliente
+   * POST /contratos/inserir
+   */
+  async inserirContrato(data: {
+    id_cliente: number;
+    id_plano_principal: number;
+    id_contrato_origem?: string;
+    id_modelo?: number[];
+    mac?: string[];
+    id_plano_adicional?: number[];
+    email_usuario?: string;
+  }): Promise<OleApiResponse> {
+    return this.request('/contratos/inserir', data);
+  }
+
+  /**
+   * Envia documentação PDF para um contrato
+   * POST /contratos/enviardocumentacao/{id_cliente}/{id_contrato}
+   */
+  async enviarDocumentacao(
+    idCliente: string, 
+    idContrato: string, 
+    nome: string, 
+    conteudoBase64: string
+  ): Promise<OleApiResponse> {
+    return this.request(`/contratos/enviardocumentacao/${idCliente}/${idContrato}`, {
+      nome,
+      conteudo: conteudoBase64,
+    });
+  }
+
+  /**
+   * Lista os bloqueios de um contrato
+   * POST /contratos/listarbloqueios/{id_contrato}/{ativos}
+   */
+  async listarBloqueios(idContrato: string, apenasAtivos: boolean = true): Promise<OleApiResponse> {
+    return this.request(`/contratos/listarbloqueios/${idContrato}/${apenasAtivos}`);
+  }
+
+  /**
+   * Bloqueia um contrato
+   * POST /contratos/bloqueio/{id_contrato}
+   */
+  async bloquearContrato(
+    idContrato: string, 
+    motivoSuspensao: 1 | 2, // 1 = Inadimplência, 2 = Pedido do Cliente
+    dataEncerramento?: string
+  ): Promise<OleApiResponse> {
+    return this.request(`/contratos/bloqueio/${idContrato}`, {
+      motivo_suspensao: motivoSuspensao,
+      data_encerramento: dataEncerramento,
+    });
+  }
+
+  /**
+   * Desbloqueia um contrato
+   * POST /contratos/desbloqueio/{id_contrato}/{id_bloqueio}
+   */
+  async desbloquearContrato(idContrato: string, idBloqueio: string): Promise<OleApiResponse> {
+    return this.request(`/contratos/desbloqueio/${idContrato}/${idBloqueio}`);
+  }
+
+  /**
+   * Lista os pontos registrados com status online/offline
+   * POST /contratos/pontosregistrados/{id_contrato}
+   */
+  async listarPontosRegistrados(idContrato: string): Promise<OleApiResponse> {
+    return this.request(`/contratos/pontosregistrados/${idContrato}`);
+  }
+
+  /**
+   * Substitui equipamento de uma assinatura
+   * POST /contratos/substituirequipamento/{id_assinatura}
+   */
+  async substituirEquipamento(
+    idAssinatura: string, 
+    idModelo: number, 
+    mac: string
+  ): Promise<OleApiResponse> {
+    return this.request(`/contratos/substituirequipamento/${idAssinatura}`, {
+      id_modelo: idModelo,
+      mac,
+    });
   }
 
   // ==========================================
-  // PONTOS E DISPOSITIVOS
+  // UTILITÁRIOS
   // ==========================================
-
-  /**
-   * Busca pontos registrados
-   */
-  async buscarPontosRegistrados(idCliente: string): Promise<OleApiResponse> {
-    return this.request('/buscarPontosRegistrados.php', { idCliente });
-  }
-
-  /**
-   * Busca bloqueios do contrato
-   */
-  async buscarBloqueiosContrato(idContrato: string): Promise<OleApiResponse> {
-    return this.request('/buscarBloqueiosContrato.php', { idContrato });
-  }
-
-  // ==========================================
-  // LISTAGEM COMPLETA (PARA SINCRONIZAÇÃO)
-  // ==========================================
-
-  /**
-   * Lista todos os clientes (para sync completo)
-   */
-  async listarTodosClientes(): Promise<OleApiResponse> {
-    return this.request('/listarTodosClientes.php', {});
-  }
-
-  /**
-   * Lista todos os boletos de um cliente por documento
-   */
-  async listarBoletos(documento: string): Promise<OleApiResponse> {
-    return this.request('/listarBoletos.php', { documento });
-  }
-
-  /**
-   * Lista todos os boletos por status
-   */
-  async listarBoletosPorStatus(status: 'pendente' | 'pago' | 'vencido'): Promise<OleApiResponse> {
-    return this.request('/listarBoletos.php', { status });
-  }
 
   /**
    * Testa conexão com a API (validação de credenciais)
+   * Usa listarClientes como teste
    */
   async testarConexao(): Promise<OleApiResponse<{ valid: boolean }>> {
     try {
-      const response = await this.listarTodosClientes();
+      const response = await this.listarClientes();
       return {
         success: response.success,
         data: { valid: response.success },

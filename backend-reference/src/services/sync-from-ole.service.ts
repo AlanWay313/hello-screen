@@ -1,5 +1,6 @@
 // Serviço de Sincronização: Olé TV → Banco Local
 // Responsável por buscar dados da API Olé TV e persistir no MySQL
+// Baseado na documentação oficial: /api-docs
 
 import { OleApiService } from './ole-api.service';
 import prisma from '../lib/prisma';
@@ -53,6 +54,8 @@ export class SyncFromOleService {
 
   // ==========================================
   // SINCRONIZAÇÃO DE CLIENTES
+  // Endpoint: POST /clientes/listar
+  // Retorno: { retorno_status: true, lista: [...] }
   // ==========================================
 
   async syncClientes(): Promise<SyncResult> {
@@ -69,17 +72,21 @@ export class SyncFromOleService {
     logger.info('🔄 Iniciando sincronização de clientes da Olé TV...');
 
     try {
-      // Buscar todos os clientes da API Olé TV
-      const response = await this.oleApi.listarTodosClientes();
+      // Buscar todos os clientes via POST /clientes/listar
+      const response = await this.oleApi.listarClientes();
 
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Falha ao buscar clientes da Olé TV');
       }
 
-      const clientes = Array.isArray(response.data) 
-        ? response.data 
-        : response.data.clientes || response.data.retorno || [];
+      // Estrutura da resposta: { retorno_status: true, lista: [...] }
+      const data = response.data;
+      
+      if (!data.retorno_status) {
+        throw new Error(data.msg || 'API retornou erro: retorno_status = false');
+      }
 
+      const clientes = data.lista || [];
       logger.info(`📋 ${clientes.length} clientes encontrados na Olé TV`);
 
       // Processar cada cliente
@@ -90,7 +97,7 @@ export class SyncFromOleService {
         } catch (error) {
           result.failed++;
           const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
-          result.errors.push(`Cliente ${cliente.documento || cliente.id}: ${errorMsg}`);
+          result.errors.push(`Cliente ${cliente.cpf_cnpj || cliente.id}: ${errorMsg}`);
           logger.error(`Erro ao sincronizar cliente: ${errorMsg}`);
         }
       }
@@ -109,52 +116,40 @@ export class SyncFromOleService {
   }
 
   private async upsertCliente(oleCliente: any): Promise<void> {
-    const documento = this.cleanDocument(
-      oleCliente.documento || oleCliente.cpf || oleCliente.cnpj || ''
-    );
+    // Estrutura do cliente da API:
+    // { id, nome, cpf_cnpj, data_nascimento, data_cadastro }
+    const documento = this.cleanDocument(oleCliente.cpf_cnpj || '');
 
     if (!documento) {
       throw new Error('Cliente sem documento válido');
     }
 
+    const oleClienteId = String(oleCliente.id);
+
     await prisma.oleCliente.upsert({
       where: {
         integrationId_oleClienteId: {
           integrationId: this.integrationId,
-          oleClienteId: String(oleCliente.id || oleCliente.idCliente),
+          oleClienteId,
         },
       },
       update: {
         documento,
-        nome: oleCliente.nome || oleCliente.razao_social || '',
+        nome: oleCliente.nome || '',
         email: oleCliente.email || null,
-        telefone: oleCliente.telefone || oleCliente.celular || null,
-        endereco: oleCliente.endereco || null,
-        numero: oleCliente.numero || null,
-        complemento: oleCliente.complemento || null,
-        bairro: oleCliente.bairro || null,
-        cidade: oleCliente.cidade || null,
-        estado: oleCliente.estado || oleCliente.uf || null,
-        cep: oleCliente.cep || null,
-        status: oleCliente.status || oleCliente.situacao || 'ATIVO',
+        telefone: oleCliente.telefone || null,
+        status: oleCliente.status || 'Ativo',
         rawData: oleCliente,
         lastSyncAt: new Date(),
       },
       create: {
         integrationId: this.integrationId,
-        oleClienteId: String(oleCliente.id || oleCliente.idCliente),
+        oleClienteId,
         documento,
-        nome: oleCliente.nome || oleCliente.razao_social || '',
+        nome: oleCliente.nome || '',
         email: oleCliente.email || null,
-        telefone: oleCliente.telefone || oleCliente.celular || null,
-        endereco: oleCliente.endereco || null,
-        numero: oleCliente.numero || null,
-        complemento: oleCliente.complemento || null,
-        bairro: oleCliente.bairro || null,
-        cidade: oleCliente.cidade || null,
-        estado: oleCliente.estado || oleCliente.uf || null,
-        cep: oleCliente.cep || null,
-        status: oleCliente.status || oleCliente.situacao || 'ATIVO',
+        telefone: oleCliente.telefone || null,
+        status: oleCliente.status || 'Ativo',
         rawData: oleCliente,
         lastSyncAt: new Date(),
       },
@@ -163,6 +158,8 @@ export class SyncFromOleService {
 
   // ==========================================
   // SINCRONIZAÇÃO DE CONTRATOS
+  // Endpoint: POST /contratos/listar/{id_cliente}
+  // Retorno: { retorno_status: true, contratos: [...] }
   // ==========================================
 
   async syncContratos(): Promise<SyncResult> {
@@ -189,12 +186,12 @@ export class SyncFromOleService {
 
       for (const cliente of clientesLocais) {
         try {
-          const response = await this.oleApi.buscarContratos(cliente.oleClienteId);
+          // POST /contratos/listar/{id_cliente}
+          const response = await this.oleApi.listarContratos(cliente.oleClienteId);
 
-          if (response.success && response.data) {
-            const contratos = Array.isArray(response.data) 
-              ? response.data 
-              : response.data.contratos || response.data.retorno || [];
+          if (response.success && response.data && response.data.retorno_status) {
+            // Estrutura: { retorno_status: true, contratos: [...] }
+            const contratos = response.data.contratos || [];
 
             for (const contrato of contratos) {
               await this.upsertContrato(cliente.id, contrato);
@@ -222,7 +219,9 @@ export class SyncFromOleService {
   }
 
   private async upsertContrato(oleClienteLocalId: string, oleContrato: any): Promise<void> {
-    const contratoId = String(oleContrato.id || oleContrato.idContrato || oleContrato.contrato);
+    // Estrutura do contrato da API:
+    // { id, codigo, tipo, servico, data_geracao, data_ativacao, status, assinaturas: [...] }
+    const contratoId = String(oleContrato.id);
 
     await prisma.oleContrato.upsert({
       where: {
@@ -232,12 +231,10 @@ export class SyncFromOleService {
         },
       },
       update: {
-        plano: oleContrato.plano || oleContrato.nome_plano || null,
-        valor: oleContrato.valor ? parseFloat(oleContrato.valor) : null,
-        dataInicio: oleContrato.data_inicio ? new Date(oleContrato.data_inicio) : null,
-        dataVencimento: oleContrato.data_vencimento ? new Date(oleContrato.data_vencimento) : null,
-        status: oleContrato.status || oleContrato.situacao || 'ATIVO',
-        diaVencimento: oleContrato.dia_vencimento ? parseInt(oleContrato.dia_vencimento) : null,
+        plano: oleContrato.tipo || oleContrato.servico || null,
+        codigo: oleContrato.codigo || null,
+        dataInicio: oleContrato.data_ativacao ? this.parseDataBR(oleContrato.data_ativacao) : null,
+        status: oleContrato.status || 'Ativo',
         rawData: oleContrato,
         lastSyncAt: new Date(),
       },
@@ -245,12 +242,10 @@ export class SyncFromOleService {
         integrationId: this.integrationId,
         oleClienteId: oleClienteLocalId,
         oleContratoId: contratoId,
-        plano: oleContrato.plano || oleContrato.nome_plano || null,
-        valor: oleContrato.valor ? parseFloat(oleContrato.valor) : null,
-        dataInicio: oleContrato.data_inicio ? new Date(oleContrato.data_inicio) : null,
-        dataVencimento: oleContrato.data_vencimento ? new Date(oleContrato.data_vencimento) : null,
-        status: oleContrato.status || oleContrato.situacao || 'ATIVO',
-        diaVencimento: oleContrato.dia_vencimento ? parseInt(oleContrato.dia_vencimento) : null,
+        plano: oleContrato.tipo || oleContrato.servico || null,
+        codigo: oleContrato.codigo || null,
+        dataInicio: oleContrato.data_ativacao ? this.parseDataBR(oleContrato.data_ativacao) : null,
+        status: oleContrato.status || 'Ativo',
         rawData: oleContrato,
         lastSyncAt: new Date(),
       },
@@ -259,6 +254,8 @@ export class SyncFromOleService {
 
   // ==========================================
   // SINCRONIZAÇÃO DE BOLETOS
+  // Endpoint: POST /boletos/listar/{id_cliente}
+  // Retorno: { retorno_status: true, boletos: [...] }
   // ==========================================
 
   async syncBoletos(): Promise<SyncResult> {
@@ -278,19 +275,19 @@ export class SyncFromOleService {
       // Buscar clientes locais para obter boletos de cada um
       const clientesLocais = await prisma.oleCliente.findMany({
         where: { integrationId: this.integrationId },
-        select: { oleClienteId: true, id: true, documento: true },
+        select: { oleClienteId: true, id: true },
       });
 
       logger.info(`📋 Buscando boletos de ${clientesLocais.length} clientes...`);
 
       for (const cliente of clientesLocais) {
         try {
-          const response = await this.oleApi.listarBoletos(cliente.documento);
+          // POST /boletos/listar/{id_cliente}
+          const response = await this.oleApi.listarBoletos(cliente.oleClienteId);
 
-          if (response.success && response.data) {
-            const boletos = Array.isArray(response.data) 
-              ? response.data 
-              : response.data.boletos || response.data.retorno || [];
+          if (response.success && response.data && response.data.retorno_status) {
+            // Estrutura: { retorno_status: true, boletos: [...] }
+            const boletos = response.data.boletos || [];
 
             for (const boleto of boletos) {
               await this.upsertBoleto(cliente.id, boleto);
@@ -318,7 +315,13 @@ export class SyncFromOleService {
   }
 
   private async upsertBoleto(oleClienteLocalId: string, oleBoleto: any): Promise<void> {
-    const boletoId = String(oleBoleto.id || oleBoleto.idBoleto || oleBoleto.nosso_numero);
+    // Estrutura do boleto da API:
+    // { id, codigo, formato, datas: { geracao, vencimento, pagamento }, valores: { valor }, status, linha_digitavel }
+    const boletoId = String(oleBoleto.id);
+
+    // Parse do valor (formato "R$ 99,99" → 99.99)
+    const valorStr = oleBoleto.valores?.valor || oleBoleto.valor || '0';
+    const valor = this.parseValorBR(valorStr);
 
     await prisma.oleBoleto.upsert({
       where: {
@@ -328,13 +331,12 @@ export class SyncFromOleService {
         },
       },
       update: {
-        valor: oleBoleto.valor ? parseFloat(oleBoleto.valor) : 0,
-        dataVencimento: oleBoleto.data_vencimento ? new Date(oleBoleto.data_vencimento) : null,
-        dataPagamento: oleBoleto.data_pagamento ? new Date(oleBoleto.data_pagamento) : null,
-        status: oleBoleto.status || oleBoleto.situacao || 'PENDENTE',
+        valor,
+        dataVencimento: oleBoleto.datas?.vencimento ? this.parseDataBR(oleBoleto.datas.vencimento) : null,
+        dataPagamento: oleBoleto.datas?.pagamento ? this.parseDataBR(oleBoleto.datas.pagamento) : null,
+        status: oleBoleto.status || 'Em Aberto',
         linhaDigitavel: oleBoleto.linha_digitavel || null,
-        codigoBarras: oleBoleto.codigo_barras || null,
-        urlPdf: oleBoleto.url_pdf || oleBoleto.link_boleto || null,
+        codigoBarras: oleBoleto.codigo || null,
         rawData: oleBoleto,
         lastSyncAt: new Date(),
       },
@@ -342,13 +344,12 @@ export class SyncFromOleService {
         integrationId: this.integrationId,
         oleClienteId: oleClienteLocalId,
         oleBoletoId: boletoId,
-        valor: oleBoleto.valor ? parseFloat(oleBoleto.valor) : 0,
-        dataVencimento: oleBoleto.data_vencimento ? new Date(oleBoleto.data_vencimento) : null,
-        dataPagamento: oleBoleto.data_pagamento ? new Date(oleBoleto.data_pagamento) : null,
-        status: oleBoleto.status || oleBoleto.situacao || 'PENDENTE',
+        valor,
+        dataVencimento: oleBoleto.datas?.vencimento ? this.parseDataBR(oleBoleto.datas.vencimento) : null,
+        dataPagamento: oleBoleto.datas?.pagamento ? this.parseDataBR(oleBoleto.datas.pagamento) : null,
+        status: oleBoleto.status || 'Em Aberto',
         linhaDigitavel: oleBoleto.linha_digitavel || null,
-        codigoBarras: oleBoleto.codigo_barras || null,
-        urlPdf: oleBoleto.url_pdf || oleBoleto.link_boleto || null,
+        codigoBarras: oleBoleto.codigo || null,
         rawData: oleBoleto,
         lastSyncAt: new Date(),
       },
@@ -402,6 +403,26 @@ export class SyncFromOleService {
 
   private cleanDocument(doc: string): string {
     return doc.replace(/\D/g, '');
+  }
+
+  // Parse data no formato BR (dd/mm/aaaa) → Date
+  private parseDataBR(dataBR: string): Date | null {
+    if (!dataBR) return null;
+    const parts = dataBR.split('/');
+    if (parts.length !== 3) return null;
+    const [dia, mes, ano] = parts;
+    return new Date(`${ano}-${mes}-${dia}`);
+  }
+
+  // Parse valor no formato BR (R$ 99,99 ou 99,99) → number
+  private parseValorBR(valorBR: string): number {
+    if (!valorBR) return 0;
+    const cleaned = valorBR
+      .replace('R$', '')
+      .replace(/\s/g, '')
+      .replace(/\./g, '')
+      .replace(',', '.');
+    return parseFloat(cleaned) || 0;
   }
 
   // Estatísticas do banco local
