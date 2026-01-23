@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
 import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown, MoreHorizontal, Mail, Phone, MapPin, FileText, UserCheck, UserX, Clock, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,6 @@ import { useCachedData } from "@/hooks/use-cached-data"
 import ResetSenha from "../resetsenha"
 import EditarCliente from "../editarcliente"
 import ReintegrarCliente from "../reintegrarcliente"
-import { ClientProfileModal } from "./client-profile-modal"
 import { ClientesPageSkeleton } from "@/components/ui/skeleton"
 import api from "@/services/api"
 
@@ -38,10 +38,11 @@ interface Cliente {
 }
 
 const ActionsCell = React.memo(
-  ({ row, refetch, onViewProfile }: { row: any; refetch: () => void; onViewProfile: (cliente: Cliente) => void }) => {
+  ({ row, refetch, onViewProfile }: { row: any; refetch: () => void; onViewProfile: (cpfCnpj: string) => void }) => {
     const contrato = row.original.ole_contract_number
     const email = row.original.email
     const nome = row.original.nome
+    const cpfCnpj = row.original.cpf_cnpj
     const rowData = row.original
 
     return (
@@ -56,7 +57,7 @@ const ActionsCell = React.memo(
           <DropdownMenuSeparator />
           <button 
             className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent"
-            onClick={() => onViewProfile(rowData)}
+            onClick={() => onViewProfile(cpfCnpj)}
           >
             <Eye className="h-4 w-4 text-primary" />
             Ver cliente
@@ -72,7 +73,7 @@ const ActionsCell = React.memo(
 
 ActionsCell.displayName = "ActionsCell"
 
-const getColumns = (_refetch: () => void, onViewProfile: (cliente: Cliente) => void): ColumnDef<Cliente>[] => [
+const getColumns = (_refetch: () => void, onViewProfile: (cpfCnpj: string) => void): ColumnDef<Cliente>[] => [
   {
     accessorKey: "nome",
     header: ({ column }) => (
@@ -255,13 +256,13 @@ const clienteFilters: FilterOption[] = [
 
 export function TabelaDeClientes() {
   const integrador = useIntegrador()
-  const [selectedCliente, setSelectedCliente] = React.useState<Cliente | null>(null)
-  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false)
+  const navigate = useNavigate()
 
-  const handleViewProfile = React.useCallback((cliente: Cliente) => {
-    setSelectedCliente(cliente)
-    setIsProfileModalOpen(true)
-  }, [])
+  const handleViewProfile = React.useCallback((cpfCnpj: string) => {
+    // Remove caracteres especiais do CPF/CNPJ para usar na URL
+    const documento = cpfCnpj?.replace(/\D/g, '') || ''
+    navigate(`/clientes/${documento}`)
+  }, [navigate])
 
   const fetchClientes = React.useCallback(async () => {
     const result = await api.get(
@@ -346,13 +347,6 @@ export function TabelaDeClientes() {
         emptyMessage="Nenhum cliente encontrado."
         filters={clienteFilters}
         onFilterChange={handleFilterChange}
-      />
-
-      {/* Modal de Perfil do Cliente */}
-      <ClientProfileModal 
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        cliente={selectedCliente}
       />
     </div>
   )

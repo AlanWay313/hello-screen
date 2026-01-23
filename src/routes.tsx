@@ -5,6 +5,7 @@ import App from "./App";
 import DashboardPage from "./pages/Dashboard";
 import Login from "./pages/Login";
 import { Clientes } from "./pages/Clientes";
+import { ClientePerfil } from "./pages/ClientePerfil";
 import { Logs } from "./pages/Logs";
 import Financeiro from "./pages/Financeiro";
 import { Configuracoes } from "./pages/Configuracoes";
@@ -73,6 +74,7 @@ export const routes = createBrowserRouter([
     children: [
       { path: "/", element: <PrivateRoute element={<DashboardPage />} /> },
       { path: "clientes", element: <PrivateRoute element={<Clientes />} /> },
+      { path: "clientes/:documento", element: <PrivateRoute element={<ClientePerfil />} /> },
       { path: "logs", element: <PrivateRoute element={<Logs />} /> },
       { path: "financeiro", element: <AdminRoute element={<Financeiro />} /> },
       { path: "configuracoes", element: <PrivateRoute element={<Configuracoes />} /> },
