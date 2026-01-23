@@ -1,5 +1,20 @@
 const API_BASE = '/api'
 
+// Wrapper para chamadas com suporte a método get/post (usado pelo AuthContext)
+export const adminApi = {
+  get: async <T = { success: boolean }>(endpoint: string): Promise<{ data: T }> => {
+    const response = await apiRequest<T>(endpoint)
+    return { data: response }
+  },
+  post: async <T = { success: boolean }>(endpoint: string, data?: unknown): Promise<{ data: T }> => {
+    const response = await apiRequest<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+    return { data: response }
+  },
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
