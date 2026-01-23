@@ -12,6 +12,18 @@ import { SyncQueueService } from './sync-queue.service';
 // TIPOS
 // ==========================================
 
+interface ProductPayload {
+  externalId: string;
+  code: string;
+  name: string;
+  quantity?: number;
+  active?: boolean;
+  tag?: string;
+  tagId?: number;
+  integratorType?: number;
+  demonstration?: boolean;
+}
+
 interface WebhookPayload {
   action: 'create' | 'update' | 'cancel';
   externalId: string;
@@ -19,12 +31,32 @@ interface WebhookPayload {
   nome?: string;
   email?: string;
   telefone?: string;
-  products?: Array<{
-    externalId: string;
-    code: string;
-    name: string;
-    quantity?: number;
-  }>;
+  
+  // Dados do contrato (do sistema externo)
+  contratoId?: number;
+  contratoNumero?: string;
+  contratoDescricao?: string;
+  contratoInicio?: string;
+  contratoFim?: string;
+  
+  // Empresa/Filial
+  empresaId?: number;
+  empresaCodigo?: string;
+  empresaNome?: string;
+  
+  // Status
+  statusCode?: number;
+  statusDescricao?: string;
+  stageCode?: number;
+  stageDescricao?: string;
+  
+  // Produtos/Serviços
+  products?: ProductPayload[];
+  
+  // Payload original completo
+  rawPayload?: any;
+  
+  // Outros campos dinâmicos
   [key: string]: any;
 }
 

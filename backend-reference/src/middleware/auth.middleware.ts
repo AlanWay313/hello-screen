@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { logger } from '../lib/logger';
+import prisma from '../lib/prisma';
 
 interface JwtPayload {
   userId: string;
@@ -11,8 +12,83 @@ interface JwtPayload {
   exp: number;
 }
 
+// ==========================================
+// AUTENTICAÇÃO VIA HEADERS (WEBHOOK EXTERNO)
+// ==========================================
+
 /**
- * Middleware para validar JWT
+ * Middleware para autenticar webhook via headers Username/Password/Token
+ * 
+ * Headers esperados:
+ * - Username: login do sistema externo
+ * - Password: senha do sistema externo  
+ * - Token: token de autenticação adicional
+ */
+export async function webhookAuthMiddleware(req: Request, res: Response, next: NextFunction) {
+  try {
+    const username = req.headers['username'] as string;
+    const password = req.headers['password'] as string;
+    const token = req.headers['token'] as string;
+
+    // Validar presença dos headers obrigatórios
+    if (!username || !password || !token) {
+      logger.warn('Headers de autenticação ausentes', {
+        hasUsername: !!username,
+        hasPassword: !!password,
+        hasToken: !!token,
+      });
+
+      return res.status(401).json({
+        success: false,
+        error: 'Headers de autenticação obrigatórios: Username, Password, Token',
+      });
+    }
+
+    // Buscar integração pelo token (webhookSecret)
+    const integration = await prisma.integration.findFirst({
+      where: {
+        webhookSecret: token,
+        isActive: true,
+      },
+    });
+
+    if (!integration) {
+      logger.warn('Token de webhook inválido ou integração inativa');
+      return res.status(401).json({
+        success: false,
+        error: 'Token de webhook inválido',
+      });
+    }
+
+    // Verificar credenciais (opcional - pode validar contra API externa)
+    // Por ora, apenas logamos para auditoria
+    logger.info('Webhook autenticado', {
+      integrationId: integration.id,
+      username,
+    });
+
+    // Adicionar dados ao request
+    (req as any).integrationId = integration.id;
+    (req as any).webhookCredentials = { username, password, token };
+
+    next();
+
+  } catch (error: any) {
+    logger.error('Erro na autenticação do webhook', { error: error.message });
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno na autenticação',
+    });
+  }
+}
+
+// ==========================================
+// AUTENTICAÇÃO VIA JWT (ROTAS INTERNAS)
+// ==========================================
+
+/**
+ * Middleware para validar JWT (rotas internas/admin)
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   try {
@@ -46,7 +122,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
     next();
 
   } catch (error: any) {
-    logger.warn('Falha na autenticação', { error: error.message });
+    logger.warn('Falha na autenticação JWT', { error: error.message });
 
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
@@ -76,7 +152,7 @@ export function generateToken(userId: string, email?: string): string {
   return jwt.sign(
     { userId, email },
     env.JWT_SECRET,
-    { expiresIn: '7d' } // Token válido por 7 dias
+    { expiresIn: '7d' }
   );
 }
 
@@ -90,6 +166,5 @@ export function optionalAuthMiddleware(req: Request, res: Response, next: NextFu
     return next();
   }
 
-  // Se tiver header, valida normalmente
   return authMiddleware(req, res, next);
 }
