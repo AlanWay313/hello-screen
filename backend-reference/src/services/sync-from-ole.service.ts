@@ -246,37 +246,36 @@ export class SyncFromOleService {
   }
 
   private async upsertCliente(oleCliente: any): Promise<void> {
-    const documento = this.cleanDocument(oleCliente.cpf_cnpj || '');
+    const cpfCnpj = oleCliente.cpf_cnpj || '';
+    const oleId = String(oleCliente.id);
 
-    if (!documento) {
-      throw new Error('Cliente sem documento válido');
+    if (!cpfCnpj) {
+      throw new Error('Cliente sem CPF/CNPJ válido');
     }
-
-    const oleClienteId = String(oleCliente.id);
 
     await prisma.oleCliente.upsert({
       where: {
-        integrationId_oleClienteId: {
+        integrationId_oleId: {
           integrationId: this.integrationId,
-          oleClienteId,
+          oleId: oleId,
         },
       },
       update: {
-        documento,
         nome: oleCliente.nome || '',
-        email: oleCliente.email || null,
-        telefone: oleCliente.telefone || null,
+        cpfCnpj: cpfCnpj,
+        dataNascimento: oleCliente.data_nascimento || null,
+        dataCadastro: oleCliente.data_cadastro || null,
         status: oleCliente.status || 'Ativo',
         rawData: oleCliente,
         lastSyncAt: new Date(),
       },
       create: {
         integrationId: this.integrationId,
-        oleClienteId,
-        documento,
+        oleId: oleId,
         nome: oleCliente.nome || '',
-        email: oleCliente.email || null,
-        telefone: oleCliente.telefone || null,
+        cpfCnpj: cpfCnpj,
+        dataNascimento: oleCliente.data_nascimento || null,
+        dataCadastro: oleCliente.data_cadastro || null,
         status: oleCliente.status || 'Ativo',
         rawData: oleCliente,
         lastSyncAt: new Date(),
@@ -308,7 +307,7 @@ export class SyncFromOleService {
     try {
       const clientesLocais = await prisma.oleCliente.findMany({
         where: { integrationId: this.integrationId },
-        select: { oleClienteId: true, id: true, nome: true },
+        select: { oleId: true, id: true, nome: true },
       });
 
       logger.info(`📋 Buscando contratos de ${clientesLocais.length} clientes locais...`);
@@ -319,8 +318,8 @@ export class SyncFromOleService {
         async (cliente, index) => {
           try {
             const response = await this.withRetry(
-              () => this.oleApi.listarContratos(cliente.oleClienteId),
-              `listarContratos(${cliente.oleClienteId})`
+              () => this.oleApi.listarContratos(cliente.oleId),
+              `listarContratos(${cliente.oleId})`
             );
 
             if (response.success && response.data && response.data.retorno_status) {
@@ -341,20 +340,20 @@ export class SyncFromOleService {
                 }
 
                 logger.clientSync(
-                  cliente.oleClienteId, 
+                  cliente.oleId, 
                   cliente.nome || 'N/A', 
                   `${contratos.length} contrato(s), ${totalAssinaturas} assinatura(s), ${totalEquipamentos} equipamento(s)`
                 );
               } else {
-                logger.syncSkip(`Cliente ${cliente.oleClienteId}`, 'sem contratos');
+                logger.syncSkip(`Cliente ${cliente.oleId}`, 'sem contratos');
               }
             } else {
-              logger.syncSkip(`Cliente ${cliente.oleClienteId}`, 'sem contratos');
+              logger.syncSkip(`Cliente ${cliente.oleId}`, 'sem contratos');
             }
           } catch (error) {
             result.failed++;
             const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
-            result.errors.push(`Contratos cliente ${cliente.oleClienteId}: ${errorMsg}`);
+            result.errors.push(`Contratos cliente ${cliente.oleId}: ${errorMsg}`);
           }
           return cliente;
         },
@@ -517,7 +516,7 @@ export class SyncFromOleService {
     try {
       const clientesLocais = await prisma.oleCliente.findMany({
         where: { integrationId: this.integrationId },
-        select: { oleClienteId: true, id: true, nome: true },
+        select: { oleId: true, id: true, nome: true },
       });
 
       logger.info(`📋 Buscando boletos de ${clientesLocais.length} clientes locais...`);
@@ -528,15 +527,15 @@ export class SyncFromOleService {
         async (cliente, index) => {
           try {
             const response = await this.withRetry(
-              () => this.oleApi.listarBoletos(cliente.oleClienteId),
-              `listarBoletos(${cliente.oleClienteId})`
+              () => this.oleApi.listarBoletos(cliente.oleId),
+              `listarBoletos(${cliente.oleId})`
             );
 
             if (response.success && response.data && response.data.retorno_status) {
               const boletos = response.data.boletos || [];
 
               if (boletos.length > 0) {
-                logger.clientSync(cliente.oleClienteId, cliente.nome || 'N/A', `${boletos.length} boleto(s)`);
+                logger.clientSync(cliente.oleId, cliente.nome || 'N/A', `${boletos.length} boleto(s)`);
               }
 
               for (const boleto of boletos) {
@@ -545,12 +544,12 @@ export class SyncFromOleService {
                 await this.delay(50);
               }
             } else {
-              logger.syncSkip(`Cliente ${cliente.oleClienteId}`, 'sem boletos');
+              logger.syncSkip(`Cliente ${cliente.oleId}`, 'sem boletos');
             }
           } catch (error) {
             result.failed++;
             const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
-            result.errors.push(`Boletos cliente ${cliente.oleClienteId}: ${errorMsg}`);
+            result.errors.push(`Boletos cliente ${cliente.oleId}: ${errorMsg}`);
           }
           return cliente;
         },
@@ -572,37 +571,49 @@ export class SyncFromOleService {
   }
 
   private async upsertBoleto(oleClienteLocalId: string, oleBoleto: any): Promise<void> {
-    const boletoId = String(oleBoleto.id);
-    const valorStr = oleBoleto.valores?.valor || oleBoleto.valor || '0';
-    const valor = this.parseValorBR(valorStr);
+    const oleId = String(oleBoleto.id);
+
+    // Extrai objetos aninhados
+    const datas = oleBoleto.datas || {};
+    const valores = oleBoleto.valores || {};
 
     await prisma.oleBoleto.upsert({
       where: {
-        integrationId_oleBoletoId: {
+        integrationId_oleId: {
           integrationId: this.integrationId,
-          oleBoletoId: boletoId,
+          oleId: oleId,
         },
       },
       update: {
-        valor,
-        dataVencimento: oleBoleto.datas?.vencimento ? this.parseDataBR(oleBoleto.datas.vencimento) : null,
-        dataPagamento: oleBoleto.datas?.pagamento ? this.parseDataBR(oleBoleto.datas.pagamento) : null,
-        status: oleBoleto.status || 'Em Aberto',
+        codigo: oleBoleto.codigo || null,
+        formato: oleBoleto.formato || null,
+        referente: oleBoleto.referente || null,
+        dataGeracao: datas.geracao || null,
+        dataVencimento: datas.vencimento || null,
+        dataPagamento: datas.pagamento || null,
+        valorBonificacao: valores.bonificacao || null,
+        valorTotal: valores.valor || null,
+        nossoNumero: oleBoleto.nosso_numero || null,
         linhaDigitavel: oleBoleto.linha_digitavel || null,
-        codigoBarras: oleBoleto.codigo || null,
+        status: oleBoleto.status || 'Em Aberto',
         rawData: oleBoleto,
         lastSyncAt: new Date(),
       },
       create: {
         integrationId: this.integrationId,
         oleClienteId: oleClienteLocalId,
-        oleBoletoId: boletoId,
-        valor,
-        dataVencimento: oleBoleto.datas?.vencimento ? this.parseDataBR(oleBoleto.datas.vencimento) : null,
-        dataPagamento: oleBoleto.datas?.pagamento ? this.parseDataBR(oleBoleto.datas.pagamento) : null,
-        status: oleBoleto.status || 'Em Aberto',
+        oleId: oleId,
+        codigo: oleBoleto.codigo || null,
+        formato: oleBoleto.formato || null,
+        referente: oleBoleto.referente || null,
+        dataGeracao: datas.geracao || null,
+        dataVencimento: datas.vencimento || null,
+        dataPagamento: datas.pagamento || null,
+        valorBonificacao: valores.bonificacao || null,
+        valorTotal: valores.valor || null,
+        nossoNumero: oleBoleto.nosso_numero || null,
         linhaDigitavel: oleBoleto.linha_digitavel || null,
-        codigoBarras: oleBoleto.codigo || null,
+        status: oleBoleto.status || 'Em Aberto',
         rawData: oleBoleto,
         lastSyncAt: new Date(),
       },
