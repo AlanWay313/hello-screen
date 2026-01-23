@@ -34,7 +34,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClienteAtividadeRecente } from "@/components/cliente/atividade-recente";
 import { PontosRegistrados } from "@/components/cliente/pontos-registrados";
-import { BloqueiosContrato } from "@/components/cliente/bloqueios-contrato";
+// import { BloqueiosContrato } from "@/components/cliente/bloqueios-contrato"; // Temporariamente desativado
 import EditarCliente from "@/components/editarcliente";
 import ResetSenha from "@/components/resetsenha";
 import ReintegrarCliente from "@/components/reintegrarcliente";
@@ -527,25 +527,27 @@ export function ClientePerfil() {
         </motion.div>
       </div>
 
-      {/* Pontos Registrados e Bloqueios */}
+      {/* Pontos Registrados */}
       {cliente.ole_contract_number && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <PontosRegistrados idContrato={cliente.ole_contract_number} />
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55 }}
-          >
-            <BloqueiosContrato idContrato={cliente.ole_contract_number} />
-          </motion.div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <PontosRegistrados idContrato={cliente.ole_contract_number} />
+        </motion.div>
       )}
+
+      {/* Bloqueios do Contrato - Temporariamente desativado */}
+      {/* {cliente.ole_contract_number && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
+        >
+          <BloqueiosContrato idContrato={cliente.ole_contract_number} />
+        </motion.div>
+      )} */}
 
       {/* Atividade Recente */}
       <motion.div
