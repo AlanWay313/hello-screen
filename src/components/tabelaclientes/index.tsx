@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Mail, Phone, MapPin, FileText, UserCheck, UserX, Clock } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Mail, Phone, MapPin, FileText, UserCheck, UserX, Clock, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import { useCachedData } from "@/hooks/use-cached-data"
 import ResetSenha from "../resetsenha"
 import EditarCliente from "../editarcliente"
 import ReintegrarCliente from "../reintegrarcliente"
+import { ClientProfileModal } from "./client-profile-modal"
 import { ClientesPageSkeleton } from "@/components/ui/skeleton"
 import api from "@/services/api"
 
@@ -31,10 +32,13 @@ interface Cliente {
   estado?: string
   cidade?: string
   data_cadastro?: string
+  bairro?: string
+  numero?: string
+  complemento?: string
 }
 
 const ActionsCell = React.memo(
-  ({ row, refetch }: { row: any; refetch: () => void }) => {
+  ({ row, refetch, onViewProfile }: { row: any; refetch: () => void; onViewProfile: (cliente: Cliente) => void }) => {
     const contrato = row.original.ole_contract_number
     const email = row.original.email
     const nome = row.original.nome
@@ -50,6 +54,13 @@ const ActionsCell = React.memo(
         <DropdownMenuContent align="end" className="w-48 bg-popover border border-border z-50">
           <DropdownMenuLabel>Ações</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <button 
+            className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent"
+            onClick={() => onViewProfile(rowData)}
+          >
+            <Eye className="h-4 w-4 text-primary" />
+            Ver cliente
+          </button>
           <ResetSenha contratoCliente={contrato} emailCliente={email} />
           <EditarCliente data={rowData} listarClientes={refetch} />
           <ReintegrarCliente nome={nome} />
@@ -61,7 +72,7 @@ const ActionsCell = React.memo(
 
 ActionsCell.displayName = "ActionsCell"
 
-const getColumns = (_refetch: () => void): ColumnDef<Cliente>[] => [
+const getColumns = (_refetch: () => void, onViewProfile: (cliente: Cliente) => void): ColumnDef<Cliente>[] => [
   {
     accessorKey: "nome",
     header: ({ column }) => (
@@ -199,7 +210,7 @@ const getColumns = (_refetch: () => void): ColumnDef<Cliente>[] => [
     header: () => <div className="text-center font-semibold">Ações</div>,
     cell: ({ row }) => (
       <div className="flex justify-center">
-        <ActionsCell row={row} refetch={() => {}} />
+        <ActionsCell row={row} refetch={() => {}} onViewProfile={onViewProfile} />
       </div>
     ),
   },
@@ -244,6 +255,13 @@ const clienteFilters: FilterOption[] = [
 
 export function TabelaDeClientes() {
   const integrador = useIntegrador()
+  const [selectedCliente, setSelectedCliente] = React.useState<Cliente | null>(null)
+  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false)
+
+  const handleViewProfile = React.useCallback((cliente: Cliente) => {
+    setSelectedCliente(cliente)
+    setIsProfileModalOpen(true)
+  }, [])
 
   const fetchClientes = React.useCallback(async () => {
     const result = await api.get(
@@ -274,7 +292,7 @@ export function TabelaDeClientes() {
     enabled: !!integrador,
   })
 
-  const columns = React.useMemo(() => getColumns(refresh), [refresh])
+  const columns = React.useMemo(() => getColumns(refresh, handleViewProfile), [refresh, handleViewProfile])
 
   const handleFilterChange = React.useCallback((filters: Record<string, string>) => {
     console.log("Filtros aplicados:", filters)
@@ -328,6 +346,13 @@ export function TabelaDeClientes() {
         emptyMessage="Nenhum cliente encontrado."
         filters={clienteFilters}
         onFilterChange={handleFilterChange}
+      />
+
+      {/* Modal de Perfil do Cliente */}
+      <ClientProfileModal 
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        cliente={selectedCliente}
       />
     </div>
   )
