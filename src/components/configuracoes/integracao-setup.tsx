@@ -6,7 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Key, Link, Shield, Copy, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Key, Link, Shield, Copy, CheckCircle2, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface SetupResponse {
   success: boolean;
@@ -27,6 +38,7 @@ interface SetupResponse {
 export function IntegracaoSetup() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [setupComplete, setSetupComplete] = useState(false);
   const [setupResult, setSetupResult] = useState<SetupResponse | null>(null);
@@ -103,6 +115,66 @@ export function IntegracaoSetup() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRegenerateToken = async () => {
+    const authToken = localStorage.getItem("integration_auth_token");
+    if (!authToken) {
+      toast({
+        title: "Token não encontrado",
+        description: "Configure a integração primeiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRegenerating(true);
+
+    try {
+      const backendUrl = localStorage.getItem("backend_url") || "http://localhost:3000";
+
+      const response = await fetch(`${backendUrl}/integration/regenerate-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao regenerar token");
+      }
+
+      const data = await response.json();
+
+      if (setupResult) {
+        setSetupResult({
+          ...setupResult,
+          webhookHeaders: {
+            ...setupResult.webhookHeaders,
+            Token: data.webhookToken,
+          },
+          integration: {
+            ...setupResult.integration,
+            webhookToken: data.webhookToken,
+          },
+        });
+      }
+
+      toast({
+        title: "Token regenerado!",
+        description: "O novo token foi gerado com sucesso. Atualize a configuração no sistema externo.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao regenerar",
+        description: error instanceof Error ? error.message : "Não foi possível regenerar o token.",
+        variant: "destructive",
+      });
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -304,7 +376,45 @@ export function IntegracaoSetup() {
                       {setupResult.webhookHeaders.Token.substring(0, 32)}...
                     </p>
                   </div>
-                  <CopyButton text={setupResult.webhookHeaders.Token} label="Token" />
+                  <div className="flex items-center gap-1">
+                    <CopyButton text={setupResult.webhookHeaders.Token} label="Token" />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          disabled={regenerating}
+                        >
+                          <RefreshCw className={`h-4 w-4 text-muted-foreground ${regenerating ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Regenerar Token do Webhook?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            O token atual será invalidado imediatamente. Você precisará atualizar a configuração no sistema externo com o novo token.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleRegenerateToken}>
+                            {regenerating ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Regenerando...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Regenerar Token
+                              </>
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </div>
             </div>
