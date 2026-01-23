@@ -645,7 +645,7 @@ export function TabelaLogs() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
-  const [filteredData, setFilteredData] = React.useState<LogData[]>([]);
+  // filteredData agora é calculado via useMemo para evitar flash de dados vazios
   const [selectedLog, setSelectedLog] = React.useState<LogData | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'table' | 'timeline'>('table');
@@ -753,10 +753,10 @@ export function TabelaLogs() {
     return filtered;
   }, [dateFilters, globalFilter]);
 
-  React.useEffect(() => {
-    if (data) {
-      setFilteredData(applyFilters(data));
-    }
+  // Usar useMemo para calcular filteredData sincronamente (evita flash de dados vazios)
+  const filteredData = React.useMemo(() => {
+    if (!data) return [];
+    return applyFilters(data);
   }, [data, applyFilters]);
 
   const clearAllFilters = () => {
@@ -903,10 +903,8 @@ export function TabelaLogs() {
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalRows = table.getFilteredRowModel().rows.length;
 
-  // Mostrar skeleton enquanto estiver carregando OU até que os dados realmente existam
-  const showSkeleton = isLoading || (!data || (data.length === 0 && !isCached));
-  
-  if (showSkeleton && stats.total === 0) return <LogsPageSkeleton />;
+  // Mostrar skeleton enquanto estiver carregando OU enquanto não houver dados
+  if (isLoading || !data) return <LogsPageSkeleton />;
 
   return (
     <div className="space-y-6">
