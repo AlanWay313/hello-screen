@@ -17,7 +17,7 @@ const router = Router();
  */
 router.post('/full', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user!.userId;
+    const userId = (req as any).userId;
 
     // Buscar integração do usuário
     const integration = await prisma.integration.findFirst({
@@ -64,7 +64,7 @@ router.post('/full', authMiddleware, async (req, res) => {
  */
 router.post('/clientes', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user!.userId;
+    const userId = (req as any).userId;
 
     const integration = await prisma.integration.findFirst({
       where: { userId, isActive: true },
@@ -100,7 +100,7 @@ router.post('/clientes', authMiddleware, async (req, res) => {
  */
 router.post('/contratos', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user!.userId;
+    const userId = (req as any).userId;
 
     const integration = await prisma.integration.findFirst({
       where: { userId, isActive: true },
@@ -136,7 +136,7 @@ router.post('/contratos', authMiddleware, async (req, res) => {
  */
 router.post('/boletos', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user!.userId;
+    const userId = (req as any).userId;
 
     const integration = await prisma.integration.findFirst({
       where: { userId, isActive: true },
@@ -176,7 +176,7 @@ router.post('/boletos', authMiddleware, async (req, res) => {
  */
 router.get('/stats', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user!.userId;
+    const userId = (req as any).userId;
 
     const integration = await prisma.integration.findFirst({
       where: { userId, isActive: true },
@@ -212,7 +212,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
  */
 router.get('/clientes', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user!.userId;
+    const userId = (req as any).userId;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const search = req.query.search as string;
@@ -285,7 +285,7 @@ router.get('/clientes', authMiddleware, async (req, res) => {
  */
 router.get('/clientes/:id', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user!.userId;
+    const userId = (req as any).userId;
     const { id } = req.params;
 
     const integration = await prisma.integration.findFirst({
