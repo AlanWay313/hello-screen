@@ -132,23 +132,28 @@ export class SyncFromOleService {
   private async processInBatches<T, R>(
     items: T[],
     processor: (item: T, index: number) => Promise<R>,
-    batchSize: number = RATE_LIMIT_CONFIG.BATCH_SIZE
+    batchSize: number = RATE_LIMIT_CONFIG.BATCH_SIZE,
+    entityName: string = 'itens'
   ): Promise<{ results: R[]; errors: string[] }> {
     const results: R[] = [];
     const errors: string[] = [];
+    const totalBatches = Math.ceil(items.length / batchSize);
 
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(items.length / batchSize);
 
-      logger.info(`📦 Processando lote ${batchNumber}/${totalBatches} (${batch.length} itens)...`);
+      // Log do lote atual
+      logger.syncBatch(batchNumber, totalBatches, batch.length);
 
       // Processa cada item do lote com delay
       for (let j = 0; j < batch.length; j++) {
         try {
           const result = await processor(batch[j], i + j);
           results.push(result);
+          
+          // Atualiza progresso
+          logger.syncProgress(entityName, i + j + 1, items.length);
           
           // Delay entre chamadas individuais
           if (j < batch.length - 1) {
@@ -161,11 +166,12 @@ export class SyncFromOleService {
 
       // Delay entre lotes (exceto no último)
       if (i + batchSize < items.length) {
-        logger.info(`⏳ Aguardando ${RATE_LIMIT_CONFIG.DELAY_BETWEEN_BATCHES}ms antes do próximo lote...`);
+        console.log(''); // Nova linha após barra de progresso
         await this.delay(RATE_LIMIT_CONFIG.DELAY_BETWEEN_BATCHES);
       }
     }
 
+    console.log(''); // Nova linha final
     return { results, errors };
   }
 
@@ -186,7 +192,7 @@ export class SyncFromOleService {
       duration: 0,
     };
 
-    logger.info('🔄 Iniciando sincronização de clientes da Olé TV...');
+    logger.syncStart('Clientes');
 
     try {
       // Buscar todos os clientes via POST /clientes/listar (com retry)
@@ -206,7 +212,7 @@ export class SyncFromOleService {
       }
 
       const clientes = data.lista || [];
-      logger.info(`📋 ${clientes.length} clientes encontrados na Olé TV`);
+      logger.info(`📋 ${clientes.length} clientes encontrados na API Olé TV`);
 
       // Processa clientes em lotes com delay
       const { errors } = await this.processInBatches(
@@ -215,19 +221,21 @@ export class SyncFromOleService {
           await this.upsertCliente(cliente);
           result.synced++;
           return cliente;
-        }
+        },
+        RATE_LIMIT_CONFIG.BATCH_SIZE,
+        'clientes'
       );
 
       result.failed = errors.length;
       result.errors = errors;
 
-      logger.info(`✅ Clientes sincronizados: ${result.synced} | Falhas: ${result.failed}`);
+      logger.syncComplete('Clientes', result.synced, result.failed, Date.now() - startTime);
 
     } catch (error) {
       result.success = false;
       const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
       result.errors.push(errorMsg);
-      logger.error(`❌ Falha na sincronização de clientes: ${errorMsg}`);
+      logger.syncError('Clientes', errorMsg);
     }
 
     result.duration = Date.now() - startTime;
@@ -290,20 +298,20 @@ export class SyncFromOleService {
       duration: 0,
     };
 
-    logger.info('🔄 Iniciando sincronização de contratos da Olé TV...');
+    logger.syncStart('Contratos');
 
     try {
       const clientesLocais = await prisma.oleCliente.findMany({
         where: { integrationId: this.integrationId },
-        select: { oleClienteId: true, id: true },
+        select: { oleClienteId: true, id: true, nome: true },
       });
 
-      logger.info(`📋 Buscando contratos de ${clientesLocais.length} clientes...`);
+      logger.info(`📋 Buscando contratos de ${clientesLocais.length} clientes locais...`);
 
       // Processa clientes em lotes para buscar contratos
       await this.processInBatches(
         clientesLocais,
-        async (cliente) => {
+        async (cliente, index) => {
           try {
             const response = await this.withRetry(
               () => this.oleApi.listarContratos(cliente.oleClienteId),
@@ -313,13 +321,17 @@ export class SyncFromOleService {
             if (response.success && response.data && response.data.retorno_status) {
               const contratos = response.data.contratos || [];
 
+              if (contratos.length > 0) {
+                logger.clientSync(cliente.oleClienteId, cliente.nome || 'N/A', `${contratos.length} contrato(s)`);
+              }
+
               for (const contrato of contratos) {
                 await this.upsertContrato(cliente.id, contrato);
                 result.synced++;
-                
-                // Pequeno delay entre contratos do mesmo cliente
                 await this.delay(50);
               }
+            } else {
+              logger.syncSkip(`Cliente ${cliente.oleClienteId}`, 'sem contratos');
             }
           } catch (error) {
             result.failed++;
@@ -327,16 +339,18 @@ export class SyncFromOleService {
             result.errors.push(`Contratos cliente ${cliente.oleClienteId}: ${errorMsg}`);
           }
           return cliente;
-        }
+        },
+        RATE_LIMIT_CONFIG.BATCH_SIZE,
+        'contratos'
       );
 
-      logger.info(`✅ Contratos sincronizados: ${result.synced} | Falhas: ${result.failed}`);
+      logger.syncComplete('Contratos', result.synced, result.failed, Date.now() - startTime);
 
     } catch (error) {
       result.success = false;
       const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
       result.errors.push(errorMsg);
-      logger.error(`❌ Falha na sincronização de contratos: ${errorMsg}`);
+      logger.syncError('Contratos', errorMsg);
     }
 
     result.duration = Date.now() - startTime;
@@ -392,20 +406,20 @@ export class SyncFromOleService {
       duration: 0,
     };
 
-    logger.info('🔄 Iniciando sincronização de boletos da Olé TV...');
+    logger.syncStart('Boletos');
 
     try {
       const clientesLocais = await prisma.oleCliente.findMany({
         where: { integrationId: this.integrationId },
-        select: { oleClienteId: true, id: true },
+        select: { oleClienteId: true, id: true, nome: true },
       });
 
-      logger.info(`📋 Buscando boletos de ${clientesLocais.length} clientes...`);
+      logger.info(`📋 Buscando boletos de ${clientesLocais.length} clientes locais...`);
 
       // Processa clientes em lotes para buscar boletos
       await this.processInBatches(
         clientesLocais,
-        async (cliente) => {
+        async (cliente, index) => {
           try {
             const response = await this.withRetry(
               () => this.oleApi.listarBoletos(cliente.oleClienteId),
@@ -415,13 +429,17 @@ export class SyncFromOleService {
             if (response.success && response.data && response.data.retorno_status) {
               const boletos = response.data.boletos || [];
 
+              if (boletos.length > 0) {
+                logger.clientSync(cliente.oleClienteId, cliente.nome || 'N/A', `${boletos.length} boleto(s)`);
+              }
+
               for (const boleto of boletos) {
                 await this.upsertBoleto(cliente.id, boleto);
                 result.synced++;
-                
-                // Pequeno delay entre boletos do mesmo cliente
                 await this.delay(50);
               }
+            } else {
+              logger.syncSkip(`Cliente ${cliente.oleClienteId}`, 'sem boletos');
             }
           } catch (error) {
             result.failed++;
@@ -429,16 +447,18 @@ export class SyncFromOleService {
             result.errors.push(`Boletos cliente ${cliente.oleClienteId}: ${errorMsg}`);
           }
           return cliente;
-        }
+        },
+        RATE_LIMIT_CONFIG.BATCH_SIZE,
+        'boletos'
       );
 
-      logger.info(`✅ Boletos sincronizados: ${result.synced} | Falhas: ${result.failed}`);
+      logger.syncComplete('Boletos', result.synced, result.failed, Date.now() - startTime);
 
     } catch (error) {
       result.success = false;
       const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
       result.errors.push(errorMsg);
-      logger.error(`❌ Falha na sincronização de boletos: ${errorMsg}`);
+      logger.syncError('Boletos', errorMsg);
     }
 
     result.duration = Date.now() - startTime;
@@ -489,8 +509,9 @@ export class SyncFromOleService {
 
   async syncAll(): Promise<FullSyncResult> {
     const startedAt = new Date();
-    logger.info('🚀 Iniciando sincronização completa Olé TV → Banco Local...');
-    logger.info(`⚙️ Rate Limiting: ${RATE_LIMIT_CONFIG.DELAY_BETWEEN_CALLS}ms entre chamadas, lotes de ${RATE_LIMIT_CONFIG.BATCH_SIZE}`);
+    
+    // Log visual de início
+    logger.fullSyncStart();
 
     // Executar sincronizações em sequência (contratos e boletos dependem de clientes)
     const clientesResult = await this.syncClientes();
@@ -519,8 +540,15 @@ export class SyncFromOleService {
       totalFailed: clientesResult.failed + contratosResult.failed + boletosResult.failed,
     };
 
-    logger.info(`✅ Sincronização completa finalizada em ${result.duration}ms`);
-    logger.info(`📊 Total: ${result.totalSynced} registros | Falhas: ${result.totalFailed}`);
+    // Log visual de conclusão
+    logger.fullSyncComplete({
+      totalSynced: result.totalSynced,
+      totalFailed: result.totalFailed,
+      duration: result.duration,
+      clientes: { synced: clientesResult.synced, failed: clientesResult.failed },
+      contratos: { synced: contratosResult.synced, failed: contratosResult.failed },
+      boletos: { synced: boletosResult.synced, failed: boletosResult.failed },
+    });
 
     return result;
   }
