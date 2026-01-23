@@ -113,7 +113,11 @@ export function ClientsChart({ filters }: ClientsChartProps) {
   }, [integrador, filters])
 
   const formatNumber = (num: number) => num.toLocaleString('pt-BR')
-  const retencao = stats.total > 0 ? ((stats.ativos / stats.total) * 100).toFixed(1) : "0"
+  // Retenção baseada em cancelados: (total - cancelados) / total * 100
+  const totalComCancelados = stats.ativos + stats.inativos + stats.cancelados
+  const retencao = totalComCancelados > 0 
+    ? (((totalComCancelados - stats.cancelados) / totalComCancelados) * 100).toFixed(1) 
+    : "100"
   const novosUltimoMes = calculateNewClients(stats.ativos)
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -202,7 +206,7 @@ export function ClientsChart({ filters }: ClientsChartProps) {
             </p>
             <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
               <ArrowDown className="w-3 h-3" />
-              <span>{formatNumber(stats.inativos)} sem contrato</span>
+              <span>{formatNumber(stats.cancelados)} cancelados</span>
             </div>
           </div>
         </div>
