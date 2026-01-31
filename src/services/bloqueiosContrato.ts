@@ -99,4 +99,48 @@ export async function desbloquearContrato(
   }
 }
 
+/**
+ * Bloqueia um contrato
+ * Endpoint: POST /contratos/bloqueio/{id_contrato}
+ * @param idContrato - ID do contrato
+ * @param motivoSuspensao - 1 = Inadimplência, 2 = Pedido do Cliente
+ * @param dataEncerramento - Data para encerramento do bloqueio (dd/mm/aaaa) - opcional
+ */
+export async function bloquearContrato(
+  idContrato: number | string,
+  motivoSuspensao: 1 | 2,
+  dataEncerramento?: string
+): Promise<DesbloqueioResponse> {
+  const keyapi = import.meta.env.VITE_OLETV_KEYAPI;
+  const login = import.meta.env.VITE_OLETV_LOGIN;
+  const pass = import.meta.env.VITE_OLETV_PASS;
+
+  if (!keyapi || !login || !pass) {
+    console.warn('Credenciais da API OleTV não configuradas');
+    return { retorno_status: false, error: 'Credenciais não configuradas' };
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('keyapi', keyapi);
+    formData.append('login', login);
+    formData.append('pass', pass);
+    formData.append('motivo_suspensao', String(motivoSuspensao));
+    
+    if (dataEncerramento) {
+      formData.append('data_encerramento', dataEncerramento);
+    }
+
+    const response = await axios.post<DesbloqueioResponse>(
+      `https://api.oletv.net.br/contratos/bloqueio/${idContrato}`,
+      formData
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao bloquear contrato:', error);
+    return { retorno_status: false, error: 'Erro ao bloquear contrato' };
+  }
+}
+
 export type { Bloqueio, BloqueiosResponse, DesbloqueioResponse };
