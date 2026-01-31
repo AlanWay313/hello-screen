@@ -2,6 +2,7 @@ import * as React from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { buscarBloqueiosContrato } from "@/services/bloqueiosContrato"
+import { RefreshCw } from "lucide-react"
 
 type BloqueioStatus = "unknown" | "blocked" | "unblocked"
 
@@ -95,14 +96,17 @@ export function BloqueioCell({
   if (status === "unblocked") {
     return (
       <div ref={ref} className="inline-flex">
-        <Badge variant="secondary">Livre</Badge>
+        <Badge variant="secondary">Normal</Badge>
       </div>
     )
   }
 
   return (
     <div ref={ref} className="inline-flex">
-      <Badge variant="outline">—</Badge>
+      <Badge variant="outline" className="gap-1.5">
+        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+        Carregando…
+      </Badge>
     </div>
   )
 }

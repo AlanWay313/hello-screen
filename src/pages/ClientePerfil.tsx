@@ -35,6 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ClienteAtividadeRecente } from "@/components/cliente/atividade-recente";
 import { PontosRegistrados } from "@/components/cliente/pontos-registrados";
 // import { BloqueiosContrato } from "@/components/cliente/bloqueios-contrato"; // Temporariamente desativado
+import { BloqueioCell } from "@/components/tabelaclientes/bloqueio-cell";
 import EditarCliente from "@/components/editarcliente";
 import ResetSenha from "@/components/resetsenha";
 import ReintegrarCliente from "@/components/reintegrarcliente";
@@ -303,6 +304,9 @@ export function ClientePerfil() {
                     <FileText className="h-3.5 w-3.5" />
                     Contrato: {cliente.ole_contract_number}
                   </Badge>
+                )}
+                {cliente.ole_contract_number && (
+                  <BloqueioCell contratoId={cliente.ole_contract_number} />
                 )}
               </motion.div>
             </div>
