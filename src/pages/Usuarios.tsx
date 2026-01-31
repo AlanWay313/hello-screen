@@ -314,8 +314,12 @@ const EditUserModal = ({
         ...(formData.password && { password: formData.password })
       };
 
-      // Importante: o endpoint PHP valida o ID pela URL.
-      const response = await api.put(`/src/services/EditarUsuario.php?id=${encodeURIComponent(user.id)}`, updateData);
+      // Importante: o endpoint PHP valida o ID pela URL (?id=...).
+      // Rota confirmada por você: src/services/AtualizarUsuario.php
+      const response = await api.put(
+        `/src/services/AtualizarUsuario.php?id=${encodeURIComponent(user.id)}`,
+        updateData
+      );
 
       const statusCode = Number(response?.data?.status);
 
