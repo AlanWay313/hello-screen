@@ -36,8 +36,7 @@ import { ClienteAtividadeRecente } from "@/components/cliente/atividade-recente"
 import { PontosRegistrados } from "@/components/cliente/pontos-registrados";
 // import { BloqueiosContrato } from "@/components/cliente/bloqueios-contrato"; // Temporariamente desativado
 import { BloqueioCell } from "@/components/tabelaclientes/bloqueio-cell";
-import { bloquearContrato } from "@/services/bloqueiosContrato";
-import { buscarBloqueiosContrato } from "@/services/bloqueiosContrato";
+import { bloquearContrato, buscarBloqueiosContrato, desbloquearContrato } from "@/services/bloqueiosContrato";
 import EditarCliente from "@/components/editarcliente";
 import ResetSenha from "@/components/resetsenha";
 import ReintegrarCliente from "@/components/reintegrarcliente";
@@ -64,6 +63,12 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Ban } from "lucide-react";
+
+type BloqueioAtivo = {
+  id: string;
+  inicio?: string;
+  tipo_nome?: string;
+};
 
 interface Cliente {
   nome: string;
@@ -134,6 +139,9 @@ export function ClientePerfil() {
   const [showBloqueioDialog, setShowBloqueioDialog] = React.useState(false);
   const [motivoBloqueio, setMotivoBloqueio] = React.useState<"1" | "2">("2");
   const [bloqueioAplicadoEm, setBloqueioAplicadoEm] = React.useState<string | null>(null);
+  const [bloqueioAtivo, setBloqueioAtivo] = React.useState<BloqueioAtivo | null>(null);
+  const [showDesbloqueioDialog, setShowDesbloqueioDialog] = React.useState(false);
+  const [isDesbloqueando, setIsDesbloqueando] = React.useState(false);
 
   const formatOleDateTime = React.useCallback((value: string) => {
     // A API geralmente manda datas em dd/mm/aaaa (às vezes com hora). Se não der parse, mostramos como veio.
@@ -213,6 +221,7 @@ export function ClientePerfil() {
     async function fetchBloqueioAplicadoEm() {
       if (!cliente?.ole_contract_number) {
         setBloqueioAplicadoEm(null);
+        setBloqueioAtivo(null);
         return;
       }
 
@@ -221,18 +230,61 @@ export function ClientePerfil() {
 
       const bloqueios = res?.bloqueios || [];
       // Se tiver mais de um, pegamos o primeiro (a API normalmente já retorna ativos), senão mantém null
-      const inicio = bloqueios[0]?.inicio;
+      const primeiro = bloqueios[0];
+      const inicio = primeiro?.inicio;
+      setBloqueioAtivo(primeiro ? { id: String(primeiro.id), inicio: primeiro.inicio, tipo_nome: primeiro.tipo_nome } : null);
       setBloqueioAplicadoEm(inicio ? formatOleDateTime(inicio) : null);
     }
 
     fetchBloqueioAplicadoEm().catch(() => {
-      if (active) setBloqueioAplicadoEm(null);
+      if (active) {
+        setBloqueioAplicadoEm(null);
+        setBloqueioAtivo(null);
+      }
     });
 
     return () => {
       active = false;
     };
   }, [cliente?.ole_contract_number, formatOleDateTime]);
+
+  const handleDesbloquearContrato = async () => {
+    if (!cliente?.ole_contract_number || !bloqueioAtivo?.id) return;
+
+    setIsDesbloqueando(true);
+    try {
+      const res = await desbloquearContrato(cliente.ole_contract_number, bloqueioAtivo.id);
+
+      if (!res.retorno_status) {
+        toast({
+          variant: "destructive",
+          title: "Falha ao desbloquear",
+          description: res.error || res.mensagem || "A API não confirmou o desbloqueio.",
+        });
+        return;
+      }
+
+      toast({
+        title: "Contrato desbloqueado",
+        description: res.mensagem || "Desbloqueio realizado com sucesso.",
+      });
+
+      setShowDesbloqueioDialog(false);
+
+      // Atualiza status e datas no header
+      setTimeout(() => {
+        fetchCliente();
+      }, 500);
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Erro ao desbloquear",
+        description: "Tente novamente em instantes.",
+      });
+    } finally {
+      setIsDesbloqueando(false);
+    }
+  };
 
   const handleBloquearContrato = async () => {
     if (!cliente?.ole_contract_number) return;
@@ -472,18 +524,32 @@ export function ClientePerfil() {
                   />
                   <ReintegrarCliente nome={cliente.nome} />
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setIsDropdownOpen(false);
-                      setMotivoBloqueio("2");
-                      setTimeout(() => setShowBloqueioDialog(true), 100);
-                    }}
-                  >
-                    <Ban className="h-4 w-4" />
-                    Bloquear contrato
-                  </DropdownMenuItem>
+                  {bloqueioAtivo ? (
+                    <DropdownMenuItem
+                      className="gap-2 cursor-pointer"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setIsDropdownOpen(false);
+                        setTimeout(() => setShowDesbloqueioDialog(true), 100);
+                      }}
+                    >
+                      <Ban className="h-4 w-4" />
+                      Desbloquear contrato
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setIsDropdownOpen(false);
+                        setMotivoBloqueio("2");
+                        setTimeout(() => setShowBloqueioDialog(true), 100);
+                      }}
+                    >
+                      <Ban className="h-4 w-4" />
+                      Bloquear contrato
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     className="gap-2 cursor-pointer"
@@ -525,6 +591,29 @@ export function ClientePerfil() {
                       className="bg-destructive hover:bg-destructive/90"
                     >
                       {isBloqueando ? 'Bloqueando…' : 'Confirmar bloqueio'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog open={showDesbloqueioDialog} onOpenChange={setShowDesbloqueioDialog}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Desbloquear contrato?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Isso irá remover o bloqueio{bloqueioAtivo?.tipo_nome ? (
+                        <>
+                          {" "}
+                          <span className="font-medium">{bloqueioAtivo.tipo_nome}</span>
+                        </>
+                      ) : null}{" "}
+                      do contrato.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDesbloqueando}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDesbloquearContrato} disabled={isDesbloqueando}>
+                      {isDesbloqueando ? "Desbloqueando…" : "Confirmar desbloqueio"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
