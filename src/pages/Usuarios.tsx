@@ -232,7 +232,6 @@ const EditUserModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<EditUserForm>>({});
   const { toast } = useToast();
-  const integrador = useIntegrador();
 
   useEffect(() => {
     if (user && isOpen) {
@@ -307,31 +306,30 @@ const EditUserModal = ({
 
     try {
       const updateData = {
-        // Alguns backends validam o ID por chaves diferentes. Enviamos redundante para garantir compatibilidade.
-        id: user.id,
-        idUser: user.id,
-        ID: user.id,
+        // O backend de edição recebe o ID via querystring (?id=...) e os demais campos no body.
         name: formData.name,
         email: formData.email,
         username: formData.username,
         isActive: formData.isActive,
-        idIntegra: integrador,
         ...(formData.password && { password: formData.password })
       };
 
-      const response = await api.put('/src/services/AtualizarUsuario.php', updateData);
+      // Importante: o endpoint PHP valida o ID pela URL.
+      const response = await api.put(`/src/services/EditarUsuario.php?id=${encodeURIComponent(user.id)}`, updateData);
 
-      if (response.data.success) {
+      const statusCode = Number(response?.data?.status);
+
+      if (statusCode === 200) {
         toast({
           title: "Usuário atualizado",
-          description: "Os dados do usuário foram atualizados com sucesso.",
+          description: response?.data?.message || "Os dados do usuário foram atualizados com sucesso.",
           variant: "default",
         });
         
         onUserUpdated();
         handleClose();
       } else {
-        throw new Error(response.data.message || 'Erro ao atualizar usuário');
+        throw new Error(response?.data?.message || 'Erro ao atualizar usuário');
       }
     } catch (error: any) {
       console.error('Erro ao atualizar usuário:', error);
