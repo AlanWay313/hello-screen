@@ -36,11 +36,25 @@ import { ClienteAtividadeRecente } from "@/components/cliente/atividade-recente"
 import { PontosRegistrados } from "@/components/cliente/pontos-registrados";
 // import { BloqueiosContrato } from "@/components/cliente/bloqueios-contrato"; // Temporariamente desativado
 import { BloqueioCell } from "@/components/tabelaclientes/bloqueio-cell";
+import { bloquearContrato } from "@/services/bloqueiosContrato";
 import EditarCliente from "@/components/editarcliente";
 import ResetSenha from "@/components/resetsenha";
 import ReintegrarCliente from "@/components/reintegrarcliente";
 import useIntegrador from "@/hooks/use-integrador";
 import api from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Ban } from "lucide-react";
 
 interface Cliente {
   nome: string;
@@ -100,12 +114,15 @@ export function ClientePerfil() {
   const { documento } = useParams<{ documento: string }>();
   const navigate = useNavigate();
   const integrador = useIntegrador();
+  const { toast } = useToast();
   
   const [cliente, setCliente] = React.useState<Cliente | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [isBloqueando, setIsBloqueando] = React.useState(false);
+  const [showBloqueioDialog, setShowBloqueioDialog] = React.useState(false);
 
   const handleOpenEditModal = () => {
     setIsDropdownOpen(false);
@@ -155,6 +172,44 @@ export function ClientePerfil() {
   React.useEffect(() => {
     fetchCliente();
   }, [fetchCliente]);
+
+  const handleBloquearContrato = async () => {
+    if (!cliente?.ole_contract_number) return;
+
+    setIsBloqueando(true);
+    try {
+      const res = await bloquearContrato(cliente.ole_contract_number, 2); // 2 = Pedido do Cliente
+      
+      if (!res.retorno_status) {
+        toast({
+          variant: 'destructive',
+          title: 'Falha ao bloquear',
+          description: res.error || res.mensagem || 'A API não confirmou o bloqueio.',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Contrato bloqueado',
+        description: res.msg || 'Bloqueio aplicado com sucesso.',
+      });
+
+      setShowBloqueioDialog(false);
+      
+      // Recarrega os dados do cliente após 500ms
+      setTimeout(() => {
+        fetchCliente();
+      }, 500);
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao bloquear',
+        description: 'Tente novamente em instantes.',
+      });
+    } finally {
+      setIsBloqueando(false);
+    }
+  };
 
   const isPessoaJuridica = cliente?.cpf_cnpj?.length && cliente.cpf_cnpj.length > 14;
   const isAtivo = cliente?.status === 'ativo';
@@ -349,6 +404,40 @@ export function ClientePerfil() {
                     emailCliente={cliente.email} 
                   />
                   <ReintegrarCliente nome={cliente.nome} />
+                  <DropdownMenuSeparator />
+                  <AlertDialog open={showBloqueioDialog} onOpenChange={setShowBloqueioDialog}>
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem
+                        className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setIsDropdownOpen(false);
+                          setTimeout(() => setShowBloqueioDialog(true), 100);
+                        }}
+                      >
+                        <Ban className="h-4 w-4" />
+                        Bloquear contrato
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Bloquear contrato?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Realmente deseja bloquear este contrato? O cliente ficará sem acesso ao serviço.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isBloqueando}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleBloquearContrato}
+                          disabled={isBloqueando}
+                          className="bg-destructive hover:bg-destructive/90"
+                        >
+                          {isBloqueando ? 'Bloqueando…' : 'Confirmar bloqueio'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     className="gap-2 cursor-pointer"
