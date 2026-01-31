@@ -76,6 +76,37 @@ interface EditUserForm {
   password?: string;
 }
 
+function normalizeUser(raw: any): User {
+  const id =
+    raw?.id ??
+    raw?.ID ??
+    raw?.userId ??
+    raw?.idUser ??
+    raw?.id_usuario ??
+    raw?.ID_USUARIO ??
+    "";
+
+  const name = raw?.name ?? raw?.NAME ?? raw?.nome ?? "";
+  const email = raw?.email ?? raw?.EMAIL ?? "";
+  const username = raw?.username ?? raw?.USERNAME ?? raw?.user ?? raw?.login ?? "";
+
+  const rawActive = raw?.isActive ?? raw?.ACTIVE ?? raw?.active ?? raw?.ativo;
+  const isActive =
+    typeof rawActive === "boolean"
+      ? rawActive
+        ? 1
+        : 0
+      : Number(rawActive ?? 1) || 0;
+
+  return {
+    id: String(id),
+    name: String(name),
+    email: String(email),
+    username: String(username),
+    isActive,
+  };
+}
+
 // Modal customizado com suporte a dark mode
 const CustomModal = ({ 
   isOpen, 
@@ -102,6 +133,8 @@ const CustomModal = ({
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
+      // Garante que o “fundo” fique no topo quando o modal abre
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }
 
     return () => {
@@ -239,6 +272,16 @@ const EditUserModal = ({
     e.preventDefault();
     
     if (!user || !validateForm()) return;
+
+    if (!user.id || user.id === "undefined" || user.id === "null") {
+      toast({
+        title: "Editar usuário",
+        description:
+          "Não foi possível identificar o usuário (ID ausente). Recarregue a lista e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
 
@@ -463,8 +506,12 @@ export function Usuarios() {
       );
 
       if (result?.data?.data) {
-        setData(result.data.data);
-        setFilteredData(result.data.data);
+        const normalized = Array.isArray(result.data.data)
+          ? result.data.data.map(normalizeUser)
+          : [];
+
+        setData(normalized);
+        setFilteredData(normalized);
       } else {
         setData([]);
         setFilteredData([]);
