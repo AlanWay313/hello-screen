@@ -80,10 +80,14 @@ function normalizeUser(raw: any): User {
   const id =
     raw?.id ??
     raw?.ID ??
+    raw?.IDUSER ??
     raw?.userId ??
     raw?.idUser ??
     raw?.id_usuario ??
     raw?.ID_USUARIO ??
+    raw?.idUsuario ??
+    raw?.codigo ??
+    raw?.CODIGO ??
     "";
 
   const name = raw?.name ?? raw?.NAME ?? raw?.nome ?? "";
@@ -132,9 +136,25 @@ const CustomModal = ({
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
+      // Garante que o “fundo” fique no topo quando o modal abre (scroll da página)
+      // e também reseta o scroll interno do modal (quando há overflow)
+      const scrollRoot = (document.scrollingElement || document.documentElement) as HTMLElement;
+      // Faz antes de bloquear overflow para não depender do comportamento do browser
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        scrollRoot.scrollTop = 0;
+        document.body.scrollTop = 0;
+      } catch {
+        // noop
+      }
+
+      // Bloqueia scroll do fundo
       document.body.style.overflow = 'hidden';
-      // Garante que o “fundo” fique no topo quando o modal abre
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+      // Reseta scroll do conteúdo do modal
+      requestAnimationFrame(() => {
+        modalRef.current?.querySelector<HTMLElement>("[data-modal-body]")?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      });
     }
 
     return () => {
@@ -182,7 +202,7 @@ const CustomModal = ({
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+        <div data-modal-body className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
           {children}
         </div>
       </div>
@@ -287,7 +307,10 @@ const EditUserModal = ({
 
     try {
       const updateData = {
+        // Alguns backends validam o ID por chaves diferentes. Enviamos redundante para garantir compatibilidade.
         id: user.id,
+        idUser: user.id,
+        ID: user.id,
         name: formData.name,
         email: formData.email,
         username: formData.username,
