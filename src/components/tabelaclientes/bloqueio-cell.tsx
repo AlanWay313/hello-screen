@@ -100,14 +100,14 @@ export function BloqueioCell({
 
   if (status === "blocked") {
     if (showLabel) {
-      return <span ref={ref} className="text-sm text-foreground">Bloqueio: <span className="font-semibold text-destructive">Bloqueado</span></span>
+      return <span ref={ref} className="text-sm text-foreground">Status do contrato: <span className="font-semibold text-destructive">Bloqueado</span></span>
     }
     return <span ref={ref} className="text-sm font-semibold text-destructive">Bloqueado</span>
   }
 
   if (status === "unblocked") {
     if (showLabel) {
-      return <span ref={ref} className="text-sm text-foreground">Bloqueio: <span className="font-semibold text-success">Normal</span></span>
+      return <span ref={ref} className="text-sm text-foreground">Status do contrato: <span className="font-semibold text-success">Normal</span></span>
     }
     return <span ref={ref} className="text-sm font-semibold text-success">Normal</span>
   }
@@ -115,7 +115,7 @@ export function BloqueioCell({
   if (showLabel) {
     return (
       <span ref={ref} className="text-sm text-foreground inline-flex items-center gap-1.5">
-        Bloqueio: <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+        Status do contrato: <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
         <span className="text-muted-foreground">Carregando…</span>
       </span>
     )
