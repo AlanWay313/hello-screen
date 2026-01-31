@@ -22,7 +22,6 @@ export function DeletarUsuario({ idUser, listarUsuarios }: UserProps) {
 
   // Função para deletar o usuário
   async function DeletarUsuarioUnico() {
-   
     try {
       const result = await api.delete(
         "/src/services/DeletarUsuario.php",
@@ -34,9 +33,17 @@ export function DeletarUsuario({ idUser, listarUsuarios }: UserProps) {
       );
 
       console.log("Usuário deletado com sucesso:", result.data);
-      listarUsuarios(); // Atualiza a lista de usuários após a exclusão
-      setIsDialogOpen(false); // Fecha o dialog após deletar
+      
+      // Fecha o dialog ANTES de atualizar a lista para evitar conflito de foco
+      setIsDialogOpen(false);
+      
+      // Aguarda um pequeno delay para garantir que o dialog fechou antes de atualizar
+      setTimeout(() => {
+        listarUsuarios(); // Atualiza a lista de usuários após a exclusão
+      }, 100);
     } catch (error: any) {
+      setIsDialogOpen(false); // Fecha o dialog mesmo em caso de erro
+      
       if (error.response) {
         console.error("Erro na resposta:", error.response.data);
       } else if (error.request) {
