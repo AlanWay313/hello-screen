@@ -54,6 +54,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Ban } from "lucide-react";
 
 interface Cliente {
@@ -123,6 +131,7 @@ export function ClientePerfil() {
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [isBloqueando, setIsBloqueando] = React.useState(false);
   const [showBloqueioDialog, setShowBloqueioDialog] = React.useState(false);
+  const [motivoBloqueio, setMotivoBloqueio] = React.useState<"1" | "2">("2");
 
   const handleOpenEditModal = () => {
     setIsDropdownOpen(false);
@@ -178,7 +187,7 @@ export function ClientePerfil() {
 
     setIsBloqueando(true);
     try {
-      const res = await bloquearContrato(cliente.ole_contract_number, 2); // 2 = Pedido do Cliente
+      const res = await bloquearContrato(cliente.ole_contract_number, Number(motivoBloqueio) as 1 | 2);
       
       if (!res.retorno_status) {
         toast({
@@ -195,6 +204,7 @@ export function ClientePerfil() {
       });
 
       setShowBloqueioDialog(false);
+      setMotivoBloqueio("2");
       
       // Recarrega os dados do cliente após 500ms
       setTimeout(() => {
@@ -412,6 +422,7 @@ export function ClientePerfil() {
                         onSelect={(e) => {
                           e.preventDefault();
                           setIsDropdownOpen(false);
+                          setMotivoBloqueio("2");
                           setTimeout(() => setShowBloqueioDialog(true), 100);
                         }}
                       >
@@ -423,9 +434,23 @@ export function ClientePerfil() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Bloquear contrato?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Realmente deseja bloquear este contrato? O cliente ficará sem acesso ao serviço.
+                          Selecione o motivo e confirme para aplicar o bloqueio. O cliente ficará sem acesso ao serviço.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="motivo-bloqueio">Motivo do bloqueio</Label>
+                        <Select value={motivoBloqueio} onValueChange={(v) => setMotivoBloqueio(v as "1" | "2")}>
+                          <SelectTrigger id="motivo-bloqueio">
+                            <SelectValue placeholder="Selecione…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2">Pedido do cliente</SelectItem>
+                            <SelectItem value="1">Financeiro (inadimplência)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <AlertDialogFooter>
                         <AlertDialogCancel disabled={isBloqueando}>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
