@@ -37,12 +37,14 @@ import { PontosRegistrados } from "@/components/cliente/pontos-registrados";
 // import { BloqueiosContrato } from "@/components/cliente/bloqueios-contrato"; // Temporariamente desativado
 import { BloqueioCell } from "@/components/tabelaclientes/bloqueio-cell";
 import { bloquearContrato } from "@/services/bloqueiosContrato";
+import { buscarBloqueiosContrato } from "@/services/bloqueiosContrato";
 import EditarCliente from "@/components/editarcliente";
 import ResetSenha from "@/components/resetsenha";
 import ReintegrarCliente from "@/components/reintegrarcliente";
 import useIntegrador from "@/hooks/use-integrador";
 import api from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,6 +133,30 @@ export function ClientePerfil() {
   const [isBloqueando, setIsBloqueando] = React.useState(false);
   const [showBloqueioDialog, setShowBloqueioDialog] = React.useState(false);
   const [motivoBloqueio, setMotivoBloqueio] = React.useState<"1" | "2">("2");
+  const [bloqueioAplicadoEm, setBloqueioAplicadoEm] = React.useState<string | null>(null);
+
+  const formatOleDateTime = React.useCallback((value: string) => {
+    // A API geralmente manda datas em dd/mm/aaaa (às vezes com hora). Se não der parse, mostramos como veio.
+    try {
+      const trimmed = String(value || "").trim();
+      const m = trimmed.match(/^([0-3]\d)\/([01]\d)\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+      if (!m) return trimmed;
+
+      const [, dd, mm, yyyy, HH = "00", II = "00", SS = "00"] = m;
+      const d = new Date(
+        Number(yyyy),
+        Number(mm) - 1,
+        Number(dd),
+        Number(HH),
+        Number(II),
+        Number(SS)
+      );
+      if (Number.isNaN(d.getTime())) return trimmed;
+      return format(d, "dd/MM/yyyy HH:mm");
+    } catch {
+      return value;
+    }
+  }, []);
 
   const handleOpenEditModal = () => {
     setIsDropdownOpen(false);
@@ -180,6 +206,33 @@ export function ClientePerfil() {
   React.useEffect(() => {
     fetchCliente();
   }, [fetchCliente]);
+
+  React.useEffect(() => {
+    let active = true;
+
+    async function fetchBloqueioAplicadoEm() {
+      if (!cliente?.ole_contract_number) {
+        setBloqueioAplicadoEm(null);
+        return;
+      }
+
+      const res = await buscarBloqueiosContrato(cliente.ole_contract_number, true);
+      if (!active) return;
+
+      const bloqueios = res?.bloqueios || [];
+      // Se tiver mais de um, pegamos o primeiro (a API normalmente já retorna ativos), senão mantém null
+      const inicio = bloqueios[0]?.inicio;
+      setBloqueioAplicadoEm(inicio ? formatOleDateTime(inicio) : null);
+    }
+
+    fetchBloqueioAplicadoEm().catch(() => {
+      if (active) setBloqueioAplicadoEm(null);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [cliente?.ole_contract_number, formatOleDateTime]);
 
   const handleBloquearContrato = async () => {
     if (!cliente?.ole_contract_number) return;
@@ -378,6 +431,11 @@ export function ClientePerfil() {
                   transition={{ delay: 0.35 }}
                 >
                   <BloqueioCell contratoId={cliente.ole_contract_number} showLabel />
+                    {bloqueioAplicadoEm && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Bloqueado em: <span className="font-medium">{bloqueioAplicadoEm}</span>
+                      </p>
+                    )}
                 </motion.div>
               )}
             </div>
