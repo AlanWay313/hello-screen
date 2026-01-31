@@ -3,9 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Ban, RefreshCw, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
-import { buscarBloqueiosContrato, Bloqueio } from '@/services/bloqueiosContrato';
+import { buscarBloqueiosContrato, Bloqueio, desbloquearContrato } from '@/services/bloqueiosContrato';
 import { motion } from 'framer-motion';
+import { toast } from '@/hooks/use-toast';
 
 interface BloqueiosContratoProps {
   idContrato: string | number;
@@ -32,6 +44,7 @@ export function BloqueiosContrato({ idContrato }: BloqueiosContratoProps) {
   const [bloqueios, setBloqueios] = React.useState<Bloqueio[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [desbloqueandoId, setDesbloqueandoId] = React.useState<string | null>(null);
 
   const fetchBloqueios = React.useCallback(async () => {
     setIsLoading(true);
@@ -87,6 +100,36 @@ export function BloqueiosContrato({ idContrato }: BloqueiosContratoProps) {
         return <Clock className="h-5 w-5 text-warning" />;
       default:
         return <AlertTriangle className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const handleDesbloquear = async (bloqueio: Bloqueio) => {
+    setDesbloqueandoId(bloqueio.id);
+    try {
+      const res = await desbloquearContrato(idContrato, bloqueio.id);
+      if (!res.retorno_status) {
+        toast({
+          variant: 'destructive',
+          title: 'Falha ao desbloquear',
+          description: res.error || res.mensagem || 'A API não confirmou o desbloqueio.',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Contrato desbloqueado',
+        description: res.mensagem || 'Desbloqueio realizado com sucesso.',
+      });
+
+      await fetchBloqueios();
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao desbloquear',
+        description: 'Tente novamente em instantes.',
+      });
+    } finally {
+      setDesbloqueandoId(null);
     }
   };
 
@@ -164,7 +207,33 @@ export function BloqueiosContrato({ idContrato }: BloqueiosContratoProps) {
                     {bloqueio.termino && <p>Término: {bloqueio.termino}</p>}
                   </div>
                 </div>
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 flex items-center gap-2">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={desbloqueandoId === bloqueio.id || isLoading}
+                      >
+                        {desbloqueandoId === bloqueio.id ? 'Desbloqueando…' : 'Desbloquear'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Desbloquear contrato?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Isso irá remover o bloqueio <span className="font-medium">{bloqueio.tipo_nome}</span> do contrato.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDesbloquear(bloqueio)}>
+                          Confirmar desbloqueio
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
                   {getStatusIcon(bloqueio.status_nome)}
                 </div>
               </motion.div>
