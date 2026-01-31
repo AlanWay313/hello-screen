@@ -52,7 +52,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Select,
@@ -415,54 +414,18 @@ export function ClientePerfil() {
                   />
                   <ReintegrarCliente nome={cliente.nome} />
                   <DropdownMenuSeparator />
-                  <AlertDialog open={showBloqueioDialog} onOpenChange={setShowBloqueioDialog}>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem
-                        className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          setIsDropdownOpen(false);
-                          setMotivoBloqueio("2");
-                          setTimeout(() => setShowBloqueioDialog(true), 100);
-                        }}
-                      >
-                        <Ban className="h-4 w-4" />
-                        Bloquear contrato
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Bloquear contrato?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Selecione o motivo e confirme para aplicar o bloqueio. O cliente ficará sem acesso ao serviço.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="motivo-bloqueio">Motivo do bloqueio</Label>
-                        <Select value={motivoBloqueio} onValueChange={(v) => setMotivoBloqueio(v as "1" | "2")}>
-                          <SelectTrigger id="motivo-bloqueio">
-                            <SelectValue placeholder="Selecione…" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="2">Pedido do cliente</SelectItem>
-                            <SelectItem value="1">Financeiro (inadimplência)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isBloqueando}>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleBloquearContrato}
-                          disabled={isBloqueando}
-                          className="bg-destructive hover:bg-destructive/90"
-                        >
-                          {isBloqueando ? 'Bloqueando…' : 'Confirmar bloqueio'}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <DropdownMenuItem
+                    className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setIsDropdownOpen(false);
+                      setMotivoBloqueio("2");
+                      setTimeout(() => setShowBloqueioDialog(true), 100);
+                    }}
+                  >
+                    <Ban className="h-4 w-4" />
+                    Bloquear contrato
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     className="gap-2 cursor-pointer"
@@ -473,6 +436,41 @@ export function ClientePerfil() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <AlertDialog open={showBloqueioDialog} onOpenChange={setShowBloqueioDialog}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Bloquear contrato?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Selecione o motivo e confirme para aplicar o bloqueio. O cliente ficará sem acesso ao serviço.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="motivo-bloqueio">Motivo do bloqueio</Label>
+                    <Select value={motivoBloqueio} onValueChange={(v) => setMotivoBloqueio(v as "1" | "2")}>
+                      <SelectTrigger id="motivo-bloqueio">
+                        <SelectValue placeholder="Selecione…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2">Pedido do cliente</SelectItem>
+                        <SelectItem value="1">Financeiro (inadimplência)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isBloqueando}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleBloquearContrato}
+                      disabled={isBloqueando}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      {isBloqueando ? 'Bloqueando…' : 'Confirmar bloqueio'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </motion.div>
           </div>
         </div>
