@@ -1,6 +1,5 @@
 import * as React from "react"
 
-import { Badge } from "@/components/ui/badge"
 import { buscarBloqueiosContrato } from "@/services/bloqueiosContrato"
 import { RefreshCw } from "lucide-react"
 
@@ -46,9 +45,11 @@ async function fetchBloqueioStatus(contratoId: string): Promise<BloqueioStatus> 
 export function BloqueioCell({
   contratoId,
   onResolved,
+  showLabel = false,
 }: {
   contratoId: string | number
   onResolved?: (contratoId: string, status: BloqueioStatus) => void
+  showLabel?: boolean
 }) {
   const id = React.useMemo(() => normalizeContratoId(contratoId), [contratoId])
   const [status, setStatus] = React.useState<BloqueioStatus>(() => bloqueioCache.get(id) ?? "unknown")
@@ -86,28 +87,33 @@ export function BloqueioCell({
   }, [id, onResolved, status])
 
   if (status === "blocked") {
-    return (
-      <div ref={ref} className="inline-flex">
-        <Badge variant="destructive">Bloqueado</Badge>
-      </div>
-    )
+    if (showLabel) {
+      return <span ref={ref} className="text-sm text-foreground">Bloqueio: <span className="font-semibold text-destructive">Bloqueado</span></span>
+    }
+    return <span ref={ref} className="text-sm font-semibold text-destructive">Bloqueado</span>
   }
 
   if (status === "unblocked") {
+    if (showLabel) {
+      return <span ref={ref} className="text-sm text-foreground">Bloqueio: <span className="font-semibold text-success">Normal</span></span>
+    }
+    return <span ref={ref} className="text-sm font-semibold text-success">Normal</span>
+  }
+
+  if (showLabel) {
     return (
-      <div ref={ref} className="inline-flex">
-        <Badge variant="secondary">Normal</Badge>
-      </div>
+      <span ref={ref} className="text-sm text-foreground inline-flex items-center gap-1.5">
+        Bloqueio: <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+        <span className="text-muted-foreground">Carregando…</span>
+      </span>
     )
   }
 
   return (
-    <div ref={ref} className="inline-flex">
-      <Badge variant="outline" className="gap-1.5">
-        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        Carregando…
-      </Badge>
-    </div>
+    <span ref={ref} className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
+      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+      Carregando…
+    </span>
   )
 }
 

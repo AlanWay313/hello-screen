@@ -19,7 +19,6 @@ import EditarCliente from "../editarcliente"
 import ReintegrarCliente from "../reintegrarcliente"
 import { ClientesPageSkeleton } from "@/components/ui/skeleton"
 import api from "@/services/api"
-import { BloqueioCell, type BloqueioStatus } from "./bloqueio-cell"
 
 interface Cliente {
   nome: string
@@ -30,7 +29,6 @@ interface Cliente {
   endereco_logradouro: string
   endereco_cep: string
   status?: string
-  bloqueado?: "sim" | "nao" | ""
   estado?: string
   cidade?: string
   data_cadastro?: string
@@ -75,11 +73,7 @@ const ActionsCell = React.memo(
 
 ActionsCell.displayName = "ActionsCell"
 
-const getColumns = (
-  _refetch: () => void,
-  onViewProfile: (cpfCnpj: string) => void,
-  onResolveBloqueio: (contratoId: string, status: BloqueioStatus) => void
-): ColumnDef<Cliente>[] => [
+const getColumns = (_refetch: () => void, onViewProfile: (cpfCnpj: string) => void): ColumnDef<Cliente>[] => [
   {
     accessorKey: "nome",
     header: ({ column }) => (
@@ -213,16 +207,6 @@ const getColumns = (
     },
   },
   {
-    accessorKey: "bloqueado",
-    header: "Bloqueio",
-    cell: ({ row }) => (
-      <BloqueioCell
-        contratoId={row.original.ole_contract_number}
-        onResolved={onResolveBloqueio}
-      />
-    ),
-  },
-  {
     id: "actions",
     header: () => <div className="text-center font-semibold">Ações</div>,
     cell: ({ row }) => (
@@ -251,21 +235,11 @@ const clienteFilters: FilterOption[] = [
       { value: "cnpj", label: "CNPJ (Pessoa Jurídica)" },
     ],
   },
-  {
-    id: "bloqueado",
-    label: "Bloqueio",
-    options: [
-      { value: "sim", label: "Bloqueados" },
-      { value: "nao", label: "Não bloqueados" },
-    ],
-  },
 ]
 
 export function TabelaDeClientes() {
   const integrador = useIntegrador()
   const navigate = useNavigate()
-
-  const [bloqueioByContrato, setBloqueioByContrato] = React.useState<Record<string, BloqueioStatus>>({})
 
   const handleViewProfile = React.useCallback((cpfCnpj: string) => {
     // Remove caracteres especiais do CPF/CNPJ para usar na URL
@@ -284,7 +258,6 @@ export function TabelaDeClientes() {
       ...cliente,
       status: cliente.email ? 'ativo' : 'inativo',
       tipo_documento: cliente.cpf_cnpj?.length > 14 ? 'cnpj' : 'cpf',
-      bloqueado: "",
     }))
 
     return clientesWithStatus
@@ -303,30 +276,7 @@ export function TabelaDeClientes() {
     enabled: !!integrador,
   })
 
-  const onResolveBloqueio = React.useCallback((contratoId: string, status: BloqueioStatus) => {
-    setBloqueioByContrato((prev) => {
-      if (prev[contratoId] === status) return prev
-      return { ...prev, [contratoId]: status }
-    })
-  }, [])
-
-  const dataWithBloqueio = React.useMemo(() => {
-    const rows = data || []
-    if (!rows.length) return rows
-
-    return rows.map((c) => {
-      const contratoId = String(c.ole_contract_number ?? "").trim()
-      const status = contratoId ? bloqueioByContrato[contratoId] : undefined
-      const bloqueado: Cliente["bloqueado"] =
-        status === "blocked" ? "sim" : status === "unblocked" ? "nao" : ""
-      return { ...c, bloqueado }
-    })
-  }, [bloqueioByContrato, data])
-
-  const columns = React.useMemo(
-    () => getColumns(refresh, handleViewProfile, onResolveBloqueio),
-    [refresh, handleViewProfile, onResolveBloqueio]
-  )
+  const columns = React.useMemo(() => getColumns(refresh, handleViewProfile), [refresh, handleViewProfile])
 
   const handleFilterChange = React.useCallback((filters: Record<string, string>) => {
     console.log("Filtros aplicados:", filters)
@@ -372,7 +322,7 @@ export function TabelaDeClientes() {
       
       <DataTable
         columns={columns}
-        data={dataWithBloqueio}
+        data={data || []}
         searchPlaceholder="Pesquisar por nome, email, documento ou contrato..."
         searchableColumns={["nome", "email", "cpf_cnpj", "ole_contract_number", "contato"]}
         onRefresh={refresh}

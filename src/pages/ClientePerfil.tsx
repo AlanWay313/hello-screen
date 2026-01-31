@@ -305,10 +305,17 @@ export function ClientePerfil() {
                     Contrato: {cliente.ole_contract_number}
                   </Badge>
                 )}
-                {cliente.ole_contract_number && (
-                  <BloqueioCell contratoId={cliente.ole_contract_number} />
-                )}
               </motion.div>
+              
+              {cliente.ole_contract_number && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35 }}
+                >
+                  <BloqueioCell contratoId={cliente.ole_contract_number} showLabel />
+                </motion.div>
+              )}
             </div>
 
             {/* Ações */}
